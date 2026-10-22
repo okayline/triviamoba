@@ -1,0 +1,9 @@
+{
+  // TriviaMoba. The Worker's name must match the one in the Cloudflare dashboard (triviamoba).
+  // Static page only for now: everything in public/ is served as is. No database, no accounts, no ledger yet.
+  "name": "triviamoba",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "public"
+  }
+}

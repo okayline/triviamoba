@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TriviaMoba</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: three horizontal lanes stacked like a MOBA minimap (you on the left, the ghost on the right), with the current step's panel under them. Dark by choice: a single committed look. */
+:root {
+  --ink: #0c1215;
+  --panel: #131c21;
+  --panel-2: #192630;
+  --line: #27363f;
+  --fg: #e8efe9;
+  --mute: #8fa3a8;
+  --sci: #4fd1c5;
+  --arts: #e8d36a;
+  --places: #5aa7ff;
+  --pop: #f06aa8;
+  --clutch: #ff7a45;
+  --feed: #5fd38d;
+  --tilt: #c58cff;
+  --bad: #ff6b6b;
+  --f-display: "Chakra Petch", "Arial Narrow", sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--fg);
+  font: 400 15px/1.45 var(--f-body);
+  padding-block: 14px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 520px; margin: 0 auto; display: grid; gap: 14px; }
+h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; }
+h1 { font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-height: 1; }
+.sub { color: var(--mute); font-size: 13px; margin-top: 6px; }
+.mono { font-family: var(--f-mono); }
+.label { font: 500 11px/1 var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--mute); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 12px; min-width: 0; }
+.seed { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+/* lanes */
+.lane { display: grid; gap: 6px; }
+.lane-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.lane-name { font: 700 14px/1 var(--f-display); letter-spacing: .08em; text-transform: uppercase; }
+.lane.now .lane-name::after { content: "  ◂ now"; color: var(--mute); font: 500 11px var(--f-mono); letter-spacing: .06em; text-transform: none; }
+.track { position: relative; height: 34px; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--line); overflow: hidden; }
+.track::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--line); }
+.base { position: absolute; top: 0; bottom: 0; width: 46px; display: grid; place-items: center; font: 700 12px var(--f-display); letter-spacing: .06em; }
+.base.me { left: 0; }
+.base.gh { right: 0; color: var(--mute); }
+.marker { position: absolute; top: 4px; bottom: 4px; width: 8px; margin-left: -4px; border-radius: 3px; transition: left .5s cubic-bezier(.3,.8,.3,1); }
+.fill { position: absolute; top: 0; bottom: 0; left: 0; opacity: .22; transition: width .5s cubic-bezier(.3,.8,.3,1); }
+.lane-foot { display: flex; justify-content: space-between; font: 400 12px var(--f-mono); color: var(--mute); gap: 8px; }
+.lane-foot b { color: var(--fg); font-weight: 500; }
+.c-science { --lc: var(--sci); } .c-arts { --lc: var(--arts); } .c-places { --lc: var(--places); } .c-pop { --lc: var(--pop); }
+.lane .lane-name { color: var(--lc); }
+.marker, .fill { background: var(--lc); }
+.base.me { color: var(--lc); }
+
+/* heroes */
+.heroes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.hero { text-align: left; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px; color: var(--fg); font: inherit; cursor: pointer; display: grid; gap: 8px; min-width: 0; }
+.hero:hover { border-color: var(--mute); }
+.hero[aria-pressed="true"] { border-color: var(--fg); background: var(--panel); }
+.hero:focus-visible, .btn:focus-visible, .opt:focus-visible, .chip:focus-visible, .slot:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+.hero-head { display: flex; gap: 8px; align-items: center; }
+.badge { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 19px; line-height: 1; flex: none; animation: bob 2.4s ease-in-out infinite; }
+@keyframes bob { 50% { transform: translateY(-3px); } }
+.crit { display: block; font-size: 44px; line-height: 1.1; }
+.crit.win { animation: hop .6s ease-out 2; }
+.crit.lose { animation: shake .4s ease-in-out 2; filter: grayscale(.6); }
+@keyframes hop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-14px) scale(1.15); } }
+@keyframes shake { 25% { transform: translateX(-6px) rotate(-6deg); } 75% { transform: translateX(6px) rotate(6deg); } }
+.hero-name { font: 700 16px var(--f-display); }
+.hero-slot { font: 500 11px var(--f-mono); color: var(--mute); }
+.bars { display: grid; gap: 4px; }
+.bar { display: grid; grid-template-columns: 38px 1fr 12px; gap: 6px; align-items: center; font: 400 11px var(--f-mono); color: var(--mute); }
+.bar i { display: block; height: 6px; border-radius: 3px; background: var(--line); position: relative; overflow: hidden; }
+.bar i::after { content: ""; position: absolute; inset: 0 auto 0 0; width: calc(var(--w) / 3 * 100%); background: var(--lc); }
+.bar.off { opacity: .4; }
+
+.slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.slot { background: var(--panel-2); border: 1px dashed var(--line); border-radius: 8px; padding: 10px 8px; text-align: center; color: var(--mute); font: 500 12px var(--f-mono); cursor: pointer; min-width: 0; }
+.slot.full { border-style: solid; border-color: var(--lc); color: var(--fg); }
+.slot b { display: block; font: 700 16px var(--f-display); color: var(--fg); }
+
+/* controls */
+.btn { background: var(--fg); color: var(--ink); border: 0; border-radius: 8px; font: 700 16px var(--f-display); letter-spacing: .06em; text-transform: uppercase; padding: 14px 16px; cursor: pointer; width: 100%; }
+.btn[disabled] { opacity: .35; cursor: not-allowed; }
+.btn.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+.calls { display: grid; gap: 8px; }
+.call { display: grid; grid-template-columns: 92px 1fr; gap: 10px; align-items: center; text-align: left; background: var(--panel-2); border: 1px solid var(--line); border-left: 4px solid var(--cc); border-radius: 8px; padding: 12px; color: var(--fg); font: inherit; cursor: pointer; }
+.call:hover { border-color: var(--cc); }
+.call:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+.call b { font: 700 18px var(--f-display); letter-spacing: .06em; color: var(--cc); }
+.call span { font: 400 12px/1.4 var(--f-mono); color: var(--mute); }
+.k-CLUTCH { --cc: var(--clutch); } .k-FEED { --cc: var(--feed); } .k-TILT { --cc: var(--tilt); }
+.tag { color: var(--cc); font-family: var(--f-display); font-weight: 700; letter-spacing: .06em; }
+
+.q { font: 600 20px/1.3 var(--f-body); text-wrap: balance; }
+.timer { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.timer > div { height: 100%; width: 100%; background: var(--lc); transition: width .1s linear; }
+.opts { display: grid; gap: 8px; }
+.opt { text-align: left; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 13px 14px; color: var(--fg); font: 500 16px var(--f-body); cursor: pointer; }
+.opt:hover { border-color: var(--mute); }
+
+/* reveal */
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.side { background: var(--panel-2); border-radius: 8px; padding: 10px; display: grid; gap: 4px; align-content: start; min-width: 0; }
+.side .who { font: 500 11px var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--mute); }
+.side .hn { font: 700 18px var(--f-display); }
+.side .line { font: 400 12px/1.45 var(--f-mono); color: var(--mute); }
+.side .pushv { font: 700 24px var(--f-display); margin-top: 2px; }
+.pos { color: var(--feed); } .neg { color: var(--bad); }
+.verdict { font: 700 22px var(--f-display); letter-spacing: .04em; text-transform: uppercase; text-wrap: balance; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; color: var(--mute); font: 500 13px var(--f-body); cursor: pointer; }
+.chip[aria-pressed="true"] { border-color: var(--fg); color: var(--fg); background: var(--panel-2); }
+.note { color: var(--mute); font-size: 13px; }
+.row { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; flex-wrap: wrap; }
+.row:first-of-type { border-top: 0; }
+.big { font: 700 44px/1 var(--f-display); }
+.fanboard { width: 100%; height: auto; display: block; max-height: 300px; }
+.fan { opacity: .6; }
+.fan.now { opacity: 1; }
+.fan .cells { fill: none; stroke: var(--line); stroke-width: 20; stroke-dasharray: 26 4; }
+.fan .cells.on { stroke: var(--lc); opacity: .85; }
+.fan .mk { fill: var(--lc); stroke: var(--ink); stroke-width: 3; }
+.fan .gh { fill: var(--panel-2); stroke: var(--lc); stroke-width: 2; }
+.fan text { fill: var(--fg); }
+.wedge { fill: var(--panel-2); opacity: .45; stroke: var(--line); stroke-width: 1; }
+.hub { fill: var(--panel-2); stroke: var(--line); stroke-width: 2; }
+.hubt { fill: var(--fg); font: 700 12px var(--f-display); letter-spacing: .06em; }
+@media (prefers-reduced-motion: reduce) { .marker, .fill, .timer > div { transition: none; } .badge, .crit { animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>TriviaMoba</h1>
+    <div class="sub">Prototype with sample data: 6 heroes, 20 gamer and silly questions, 3 rounds a lane, one scripted ghost. Nothing is saved.</div>
+  </header>
+  <section id="board" aria-label="Lanes"></section>
+  <main id="stage" class="panel" aria-live="polite"></main>
+</div>
+
+<script>
+// ---- data (all sample content for the prototype) ----
+var TAGS = ["science", "arts", "places", "pop"];
+var LABEL = { science: "Science", arts: "Arts", places: "Places", pop: "Pop culture" };
+var SHORT = { science: "SCI", arts: "ART", places: "PLC", pop: "POP" };
+var TODAY = ["science", "places", "pop"];       // the hardcoded "daily seed" picks these 3 of the 4 categories
+var SEED = "3f9a·c07e·51b2";
+var TIME = 15;                                   // seconds per question
+
+var HEROES = [
+  { id: "marie", name: "Marie", e: "🦉", c: "#4fd1c5", w: { science: 3, arts: 0, places: 1, pop: 1 } },
+  { id: "atlas", name: "Atlas", e: "🐢", c: "#5aa7ff", w: { science: 1, arts: 1, places: 3, pop: 0 } },
+  { id: "pixel", name: "Pixel", e: "🐙", c: "#f06aa8", w: { science: 1, arts: 1, places: 0, pop: 3 } },
+  { id: "vince", name: "Vince", e: "🦜", c: "#e8d36a", w: { science: 0, arts: 3, places: 1, pop: 2 } },
+  { id: "hale",  name: "Hale",  e: "🦊", c: "#ff9d6c", w: { science: 2, arts: 0, places: 2, pop: 1 } },
+  { id: "echo",  name: "Echo",  e: "🦇", c: "#c58cff", w: { science: 1, arts: 2, places: 1, pop: 2 } }
+];
+function hero(id) { return HEROES.filter(function (h) { return h.id === id; })[0]; }
+
+// correct answer first; options are shuffled when shown
+var QS = {
+  science: [
+    { q: "Which animal has three hearts?", a: ["Octopus", "Shark", "Elephant", "Giraffe"] },
+    { q: "Bananas are slightly radioactive. Which element is to blame?", a: ["Potassium", "Uranium", "Calcium", "Iron"] },
+    { q: "What do you call a group of crows?", a: ["A murder", "A gaggle", "A pod", "A herd"] },
+    { q: "Lightning is hotter than the surface of the…?", a: ["Sun", "Lava", "A pizza oven", "A volcano"] },
+    { q: "Sound can't travel through what, which is why nobody hears you scream in space?", a: ["A vacuum", "Water", "Glass", "Lava"] }
+  ],
+  arts: [
+    { q: "Which instrument does Link play in Zelda: Ocarina of Time?", a: ["The ocarina", "A kazoo", "A banjo", "A recorder"] },
+    { q: "The Mona Lisa has no visible eyebrows. Who painted her?", a: ["Leonardo da Vinci", "Michelangelo", "Raphael", "Botticelli"] },
+    { q: "Who composed the Ode to Joy while almost completely deaf?", a: ["Beethoven", "Mozart", "Bach", "Chopin"] },
+    { q: "Who is never gonna give you up, never gonna let you down?", a: ["Rick Astley", "Barry White", "Michael Bolton", "Phil Collins"] },
+    { q: "Which painter famously cut off part of his own ear?", a: ["Van Gogh", "Monet", "Picasso", "Rembrandt"] }
+  ],
+  places: [
+    { q: "Nintendo, the home of Mario and Zelda, was founded in which country?", a: ["Japan", "The USA", "South Korea", "Sweden"] },
+    { q: "It's not Sydney and it's not Melbourne. What's Australia's capital?", a: ["Canberra", "Sydney", "Melbourne", "Perth"] },
+    { q: "Which continent has no countries at all?", a: ["Antarctica", "Europe", "South America", "Oceania"] },
+    { q: "Which country is shaped like a boot?", a: ["Italy", "Greece", "Spain", "Chile"] },
+    { q: "What is the smallest country in the world?", a: ["Vatican City", "Monaco", "San Marino", "Liechtenstein"] }
+  ],
+  pop: [
+    { q: "In Among Us, what is the secret saboteur called?", a: ["The Impostor", "The Traitor", "The Spy", "The Ghost"] },
+    { q: "Which Pokémon is number 25 in the Pokédex?", a: ["Pikachu", "Eevee", "Jigglypuff", "Meowth"] },
+    { q: "In Minecraft, which mob sneaks up on you and explodes?", a: ["The Creeper", "The Zombie", "The Skeleton", "The Enderman"] },
+    { q: "In Mario Kart, who does the blue shell go after?", a: ["Whoever is in first", "Whoever is last", "The nearest racer", "A random racer"] },
+    { q: "In Sonic the Hedgehog, what do you collect and then lose when you get hit?", a: ["Rings", "Coins", "Gems", "Stars"] }
+  ]
+};
+
+// the scripted ghost: another player's sealed lineup, replayed (hand-written for the prototype)
+var GHOST = [
+  { hero: "hale", rounds: [
+    { call: "CLUTCH", right: true,  heads: true },
+    { call: "FEED",   right: true,  heads: true },
+    { call: "CLUTCH", right: false, heads: true } ] },
+  { hero: "echo", rounds: [
+    { call: "FEED",   right: true,  heads: true },
+    { call: "TILT",   right: true,  heads: false },
+    { call: "FEED",   right: true,  heads: true } ] },
+  { hero: "pixel", rounds: [
+    { call: "CLUTCH", right: false, heads: true },
+    { call: "TILT",   right: true,  heads: true },
+    { call: "FEED",   right: true,  heads: true } ] }
+];
+var ROUNDS = 3;                                  // questions per lane
+var GHOST_HISTORY = "Sample history: CLUTCH in 5 of its last 9 lanes. Best in Science.";
+
+var CALLS = {
+  CLUTCH: "Right +3, wrong −3. Push hard.",
+  FEED: "Right +1, wrong 0. Play safe.",
+  TILT: "Right: coin flip, +5 or −2. Wrong −2."
+};
+
+// ---- rules ----
+function match(h, tag) { return h.w[tag] / 3; }                       // 0 to 1
+function pushOf(call, right, heads, m) {
+  var base;
+  if (right) base = call === "CLUTCH" ? 3 : call === "FEED" ? 1 : (heads ? 5 : -2);
+  else base = call === "CLUTCH" ? -3 : call === "FEED" ? 0 : -2;
+  return Math.round(base * (1 + m) * 10) / 10;
+}
+function shuffle(a) {
+  a = a.slice();
+  for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; }
+  return a;
+}
+function fmt(n) { return (n > 0 ? "+" : n < 0 ? "−" : "") + Math.abs(n).toFixed(Math.abs(n % 1) < 0.05 || Math.abs(n % 1) > 0.95 ? 0 : 1); }
+function cls(n) { return n > 0 ? "pos" : n < 0 ? "neg" : ""; }
+
+// ---- state ----
+var S;
+var timerId = null;
+function fresh() {
+  clearInterval(timerId);
+  S = { phase: "draft", lane: 0, round: 0, lineup: [null, null, null], k: [3, 3, 3], rounds: [[], [], []],
+        calls: [[], [], []], honesty: [[], [], []], q: null, used: {} };
+}
+function laneDone(i) { return S.rounds[i].length >= ROUNDS || S.k[i] === 1 || S.k[i] === 5; }
+function laneWinner(i) { return S.k[i] > 3 ? "you" : S.k[i] < 3 ? "ghost" : "tie"; }
+
+function pickQuestion(tag) {
+  var pool = QS[tag].filter(function (_, i) { return !S.used[tag + i]; });
+  if (!pool.length) pool = QS[tag];
+  var item = pool[Math.floor(Math.random() * pool.length)];
+  S.used[tag + QS[tag].indexOf(item)] = true;
+  return { q: item.q, right: item.a[0], opts: shuffle(item.a) };
+}
+
+// ---- rendering ----
+var $board = document.getElementById("board");
+var $stage = document.getElementById("stage");
+
+function bar(h, tag, dimArts) {
+  return '<div class="bar c-' + tag + (dimArts && TODAY.indexOf(tag) < 0 ? " off" : "") + '"><span>' + SHORT[tag] + '</span><i style="--w:' + h.w[tag] + '"></i><span>' + h.w[tag] + '</span></div>';
+}
+function bars(h) { return '<div class="bars">' + TAGS.map(function (t) { return bar(h, t, true); }).join("") + "</div>"; }
+
+// The board: a third of a wheel. Three lanes fan out over 120 degrees from a hub (your base) to the ghost's bases on the rim.
+// Each lane has 5 spaces; the marker starts on space 3 and moves one space per round toward whoever pushed more.
+var HUB = { x: 200, y: 215 }, ANG = [150, 90, 30], D0 = 30, CELL = 30, LEN = 5 * CELL;
+function pt(i, d, deg) {
+  var a = (deg === undefined ? ANG[i] : deg) * Math.PI / 180;
+  return { x: +(HUB.x + Math.cos(a) * d).toFixed(1), y: +(HUB.y - Math.sin(a) * d).toFixed(1) };
+}
+function isNow(i) { return (S.phase === "call" || S.phase === "question" || S.phase === "reveal") && S.lane === i; }
+function renderBoard() {
+  var svg = TODAY.map(function (tag, i) {
+    var k = S.k[i];
+    var a = pt(i, D0), b = pt(i, D0 + LEN), m = pt(i, D0 + CELL * (k - 0.5)), f = pt(i, D0 + CELL * k), g = pt(i, D0 + LEN + 24);
+    return '<g class="fan c-' + tag + (isNow(i) ? " now" : "") + '">' +
+      '<line class="cells" x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '"/>' +
+      '<line class="cells on" x1="' + a.x + '" y1="' + a.y + '" x2="' + f.x + '" y2="' + f.y + '"/>' +
+      '<circle class="mk" cx="' + m.x + '" cy="' + m.y + '" r="10"/>' +
+      '<circle class="gh" cx="' + g.x + '" cy="' + g.y + '" r="17"/>' +
+      '<text x="' + g.x + '" y="' + g.y + '" text-anchor="middle" dominant-baseline="central" font-size="19">' + (S.rounds[i].length ? hero(GHOST[i].hero).e : "?") + "</text></g>";
+  }).join("");
+  var rows = TODAY.map(function (tag, i) {
+    var hid = S.lineup[i];
+    var me = hid ? hero(hid).e + " " + hero(hid).name : "—";
+    var gh = S.rounds[i].length ? hero(GHOST[i].hero).e + " " + hero(GHOST[i].hero).name : "?";
+    var w = laneWinner(i);
+    var state = laneDone(i) && S.rounds[i].length ? (w === "you" ? "you win" : w === "ghost" ? "ghost wins" : "tied")
+      : isNow(i) ? "round " + (S.round + 1) + " of " + ROUNDS : "open";
+    return '<div class="lane c-' + tag + (isNow(i) ? " now" : "") + '">' +
+      '<div class="lane-top"><span class="lane-name">Lane ' + (i + 1) + " · " + LABEL[tag] + '</span>' +
+      '<span class="label">space ' + S.k[i] + " of 5 · " + state + "</span></div>" +
+      '<div class="lane-foot"><span>you: <b>' + me + '</b></span><span>ghost: <b>' + gh + "</b></span></div></div>";
+  }).join("");
+  $board.innerHTML = '<div class="panel"><svg class="fanboard" viewBox="-10 0 420 240" role="img" aria-label="Three lanes fanning out from your base to the ghost\'s bases">' +
+    '<path class="wedge" d="M' + HUB.x + ' ' + HUB.y + ' L' + pt(0, 212, 150).x + ' ' + pt(0, 212, 150).y + ' A212 212 0 0 1 ' + pt(0, 212, 30).x + ' ' + pt(0, 212, 30).y + ' Z"/>' +
+    '<circle class="hub" cx="' + HUB.x + '" cy="' + HUB.y + '" r="26"/>' +
+    '<text x="' + HUB.x + '" y="' + HUB.y + '" text-anchor="middle" dominant-baseline="central" class="hubt">YOU</text>' + svg + "</svg>" + rows + "</div>";
+}
+
+function renderDraft() {
+  var picked = S.lineup.filter(Boolean).length;
+  var slots = TODAY.map(function (tag, i) {
+    var id = S.lineup[i];
+    return '<button class="slot c-' + tag + (id ? " full" : "") + '" data-act="slot" data-i="' + i + '">' +
+      (id ? "<b>" + hero(id).e + " " + hero(id).name + "</b>" : "<b>Empty</b>") + "Lane " + (i + 1) + " · " + SHORT[tag] + "</button>";
+  }).join("");
+  var cards = HEROES.map(function (h) {
+    var at = S.lineup.indexOf(h.id);
+    return '<button class="hero" data-act="hero" data-id="' + h.id + '" aria-pressed="' + (at >= 0) + '">' +
+      '<div class="hero-head"><span class="badge" style="background:' + h.c + '">' + h.e + '</span><div><div class="hero-name">' + h.name + '</div>' +
+      '<div class="hero-slot">' + (at >= 0 ? "Lane " + (at + 1) : "bench") + "</div></div></div>" + bars(h) + "</button>";
+  }).join("");
+  $stage.innerHTML =
+    '<div class="seed"><span class="label">Day seed</span><span class="mono">' + SEED + '</span><span class="label">3 lanes sealed</span></div>' +
+    "<h2>Draft your lanes</h2>" +
+    '<div class="note">Pick 3 of 6 heroes, one per lane. Your tag weights are visible. The ghost\'s are not, and its lineup is already sealed. ' + GHOST_HISTORY + "</div>" +
+    '<div class="slots">' + slots + "</div>" +
+    '<div class="heroes">' + cards + "</div>" +
+    '<button class="btn" data-act="lock"' + (picked < 3 ? " disabled" : "") + ">Lock lineup</button>";
+}
+
+function renderCall() {
+  var tag = TODAY[S.lane], h = hero(S.lineup[S.lane]), m = match(h, tag);
+  $stage.innerHTML =
+    '<div class="lane c-' + tag + '"><span class="lane-name">Lane ' + (S.lane + 1) + " · " + LABEL[tag] + " · round " + (S.round + 1) + " of " + ROUNDS + "</span></div>" +
+    "<h2>Commit a call</h2>" +
+    '<div class="note">You see the question after you commit. <b>' + h.name + "</b> has " + h.w[tag] + "/3 in " + LABEL[tag] + ", so every push here is ×" + (1 + m).toFixed(1) + ".</div>" +
+    '<div class="calls">' + Object.keys(CALLS).map(function (k) {
+      return '<button class="call k-' + k + '" data-act="call" data-k="' + k + '"><b>' + k + "</b><span>" + CALLS[k] + "</span></button>";
+    }).join("") + "</div>";
+}
+
+function renderQuestion() {
+  var tag = TODAY[S.lane], q = S.q;
+  $stage.innerHTML =
+    '<div class="seed c-' + tag + '"><span class="lane-name">' + LABEL[tag] + " · round " + (S.round + 1) + '</span><span class="label">called <span class="tag k-' + S.calls[S.lane][S.round] + '">' + S.calls[S.lane][S.round] + "</span></span></div>" +
+    '<div class="timer c-' + tag + '"><div id="tbar"></div></div>' +
+    '<div class="q">' + q.q + "</div>" +
+    '<div class="opts">' + q.opts.map(function (o, i) { return '<button class="opt" data-act="answer" data-i="' + i + '">' + o + "</button>"; }).join("") + "</div>";
+  var end = Date.now() + TIME * 1000, bar = document.getElementById("tbar");
+  clearInterval(timerId);
+  timerId = setInterval(function () {
+    var left = end - Date.now();
+    if (left <= 0) { clearInterval(timerId); resolve(null); return; }
+    bar.style.width = (left / (TIME * 1000) * 100) + "%";
+  }, 100);
+}
+
+function renderReveal() {
+  var i = S.lane, ri = S.round, tag = TODAY[i], r = S.rounds[i][ri], g = GHOST[i].rounds[ri], gh = hero(GHOST[i].hero), me = hero(S.lineup[i]);
+  var call = S.calls[i][ri], done = laneDone(i), w = laneWinner(i);
+  var verdict = r.step > 0 ? "You push the lane" : r.step < 0 ? "Ghost pushes back" : "Held";
+  if (done) verdict = w === "you" ? "You take the lane" : w === "ghost" ? "Ghost takes the lane" : "Lane tied";
+  var answered = r.pick === null ? "Time's up. It was " + S.q.right + "." : (r.right ? "Correct: " + S.q.right : "Wrong. It was " + S.q.right + ".");
+  var last = i === 2;
+  $stage.innerHTML =
+    '<div class="label">Round ' + (ri + 1) + " of " + ROUNDS + '</div>' +
+    '<div class="verdict c-' + tag + '">' + verdict + "</div>" +
+    '<div class="note">' + answered + (call === "TILT" && r.right ? " TILT landed " + (r.heads ? "heads (+5)." : "tails (−2).") : "") + " Marker on space " + S.k[i] + " of 5.</div>" +
+    '<div class="cols">' +
+      '<div class="side"><span class="who">You</span><span class="crit ' + (r.step > 0 ? "win" : r.step < 0 ? "lose" : "") + '">' + me.e + '</span><span class="hn">' + me.name + '</span><span class="line"><span class="tag k-' + call + '">' + call + "</span> · " + LABEL[tag] + " " + me.w[tag] + "/3 · ×" + (1 + match(me, tag)).toFixed(1) + '</span><span class="pushv ' + cls(r.mine) + '">' + fmt(r.mine) + "</span></div>" +
+      '<div class="side"><span class="who">Ghost</span><span class="crit ' + (r.step < 0 ? "win" : r.step > 0 ? "lose" : "") + '">' + gh.e + '</span><span class="hn">' + gh.name + '</span><span class="line"><span class="tag k-' + g.call + '">' + g.call + "</span> · " + LABEL[tag] + " " + gh.w[tag] + "/3 · ×" + (1 + match(gh, tag)).toFixed(1) + " · " + (g.right ? "right" : "wrong") + '</span><span class="pushv ' + cls(r.theirs) + '">' + fmt(r.theirs) + "</span></div>" +
+    "</div>" +
+    '<div><div class="label" style="margin-bottom:8px">How did you get it? (no points either way)</div><div class="chips">' +
+      ["I knew it", "I guessed", "I looked it up"].map(function (t, k) {
+        return '<button class="chip" data-act="honest" data-k="' + k + '" aria-pressed="' + (S.honesty[i][ri] === k) + '">' + t + "</button>";
+      }).join("") + "</div></div>" +
+    '<button class="btn" data-act="next">' + (!done ? "Next round" : last ? "See result" : "Next lane") + "</button>";
+}
+
+function renderResult() {
+  var wins = [0, 1, 2].map(laneWinner);
+  var won = wins.filter(function (w) { return w === "you"; }).length;
+  var lost = wins.filter(function (w) { return w === "ghost"; }).length;
+  var total = 0, hon = [0, 0, 0];
+  S.rounds.forEach(function (rs) { rs.forEach(function (r) { total += r.net; }); });
+  S.honesty.forEach(function (hs) { hs.forEach(function (k) { if (k !== undefined) hon[k]++; }); });
+  var head = won > lost ? "You win" : won < lost ? "Ghost wins" : "Draw";
+  $stage.innerHTML =
+    '<div class="label">Result</div><div class="big">' + head + "</div>" +
+    '<div class="note">' + won + " lane" + (won === 1 ? "" : "s") + " won, " + lost + " lost, over " + S.rounds.reduce(function (a, rs) { return a + rs.length; }, 0) + " questions. Net push " + fmt(Math.round(total * 10) / 10) + ".</div>" +
+    "<div>" + [0, 1, 2].map(function (i) {
+      var w = wins[i];
+      return '<div class="row c-' + TODAY[i] + '"><span><span class="lane-name">' + LABEL[TODAY[i]] + "</span> · " + hero(S.lineup[i]).e + " " + hero(S.lineup[i]).name + " vs " + hero(GHOST[i].hero).e + " " + hero(GHOST[i].hero).name + '</span><span class="mono ' + (w === "you" ? "pos" : w === "ghost" ? "neg" : "") + '">' + (w === "you" ? "won" : w === "ghost" ? "lost" : "tied") + " · space " + S.k[i] + "</span></div>";
+    }).join("") + "</div>" +
+    '<div class="note">Declared: ' + hon[0] + " knew, " + hon[1] + " guessed, " + hon[2] + " looked up.</div>" +
+    '<button class="btn" data-act="again">Play again</button>';
+}
+
+function render() {
+  renderBoard();
+  if (S.phase === "draft") renderDraft();
+  else if (S.phase === "call") renderCall();
+  else if (S.phase === "question") renderQuestion();
+  else if (S.phase === "reveal") renderReveal();
+  else renderResult();
+}
+
+// ---- actions ----
+function resolve(pick) {
+  clearInterval(timerId);
+  var i = S.lane, ri = S.round, tag = TODAY[i], right = pick !== null && S.q.opts[pick] === S.q.right;
+  var heads = Math.random() < 0.5, g = GHOST[i].rounds[ri];
+  var mine = pushOf(S.calls[i][ri], right, heads, match(hero(S.lineup[i]), tag));
+  var theirs = pushOf(g.call, g.right, g.heads, match(hero(GHOST[i].hero), tag));
+  var net = Math.round((mine - theirs) * 10) / 10, step = net > 0 ? 1 : net < 0 ? -1 : 0;
+  S.k[i] = Math.max(1, Math.min(5, S.k[i] + step));
+  S.rounds[i].push({ pick: pick, right: right, heads: heads, mine: mine, theirs: theirs, net: net, step: step });
+  S.phase = "reveal";
+  render();
+}
+
+document.addEventListener("click", function (e) {
+  var b = e.target.closest("[data-act]");
+  if (!b || b.disabled) return;
+  var act = b.getAttribute("data-act");
+  if (act === "hero") {
+    var id = b.getAttribute("data-id"), at = S.lineup.indexOf(id);
+    if (at >= 0) S.lineup[at] = null;
+    else { var free = S.lineup.indexOf(null); if (free >= 0) S.lineup[free] = id; }
+  } else if (act === "slot") {
+    S.lineup[+b.getAttribute("data-i")] = null;
+  } else if (act === "lock") {
+    S.phase = "call"; S.lane = 0; S.round = 0;
+  } else if (act === "call") {
+    S.calls[S.lane][S.round] = b.getAttribute("data-k");
+    S.q = pickQuestion(TODAY[S.lane]);
+    S.phase = "question";
+  } else if (act === "answer") {
+    resolve(+b.getAttribute("data-i")); return;
+  } else if (act === "honest") {
+    S.honesty[S.lane][S.round] = +b.getAttribute("data-k");
+  } else if (act === "next") {
+    if (!laneDone(S.lane)) { S.round++; S.phase = "call"; }
+    else if (S.lane === 2) S.phase = "result";
+    else { S.lane++; S.round = 0; S.phase = "call"; }
+  } else if (act === "again") {
+    fresh();
+  }
+  render();
+});
+
+fresh();
+render();
+</script>
+</body>
+</html>
