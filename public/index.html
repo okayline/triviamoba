@@ -131,17 +131,22 @@ h1 { font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-hei
 .row { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; flex-wrap: wrap; }
 .row:first-of-type { border-top: 0; }
 .big { font: 700 44px/1 var(--f-display); }
-.fanboard { width: 100%; height: auto; display: block; max-height: 300px; }
+.fanboard { width: 100%; height: auto; display: block; max-height: 320px; }
+.fanboard .floor { fill: var(--panel-2); opacity: .5; stroke: var(--line); stroke-width: 1; }
 .fan { opacity: .6; }
 .fan.now { opacity: 1; }
-.fan .cells { fill: none; stroke: var(--line); stroke-width: 20; stroke-dasharray: 26 4; }
-.fan .cells.on { stroke: var(--lc); opacity: .85; }
-.fan .mk { fill: var(--lc); stroke: var(--ink); stroke-width: 3; }
-.fan .gh { fill: var(--panel-2); stroke: var(--lc); stroke-width: 2; }
-.fan text { fill: var(--fg); }
-.wedge { fill: var(--panel-2); opacity: .45; stroke: var(--line); stroke-width: 1; }
-.hub { fill: var(--panel-2); stroke: var(--line); stroke-width: 2; }
-.hubt { fill: var(--fg); font: 700 12px var(--f-display); letter-spacing: .06em; }
+.fanboard .t { fill: var(--line); stroke: var(--ink); stroke-width: 1; stroke-linejoin: round; }
+.fan .t.on { fill: var(--lc); }
+.hubg .t { fill: var(--panel-2); stroke: var(--line); }
+.fanboard .sd { filter: brightness(.55); }
+.fan .shadow { fill: #000; opacity: .45; }
+.fan .mk { fill: var(--lc); stroke: var(--fg); stroke-width: 2; }
+.tw { fill: var(--mute); stroke: var(--ink); stroke-width: 1; stroke-linejoin: round; }
+.tws { filter: brightness(.55); }
+.orb.me, .creep.me { fill: var(--feed); }
+.orb.gh, .creep.gh { fill: var(--bad); }
+.creep { stroke: var(--ink); stroke-width: 1; }
+.hubt { fill: var(--fg); font: 700 11px var(--f-display); letter-spacing: .06em; }
 @media (prefers-reduced-motion: reduce) { .marker, .fill, .timer > div { transition: none; } .badge, .crit { animation: none !important; } }
 </style>
 </head>
@@ -222,7 +227,17 @@ var GHOST = [
     { call: "FEED",   right: true,  heads: true } ] }
 ];
 var ROUNDS = 3;                                  // questions per lane
-var GHOST_HISTORY = "Sample history: CLUTCH in 5 of its last 9 lanes. Best in Science.";
+var GHOST_HISTORY = "Sample history: CLUTCH in 5 of its last 9 lanes. Best in Science. On mystery questions it always picks the weirdest answer.";
+
+// mystery questions have no right answer: you score by matching the ghost's pick (always the last, weirdest option listed)
+var MYSTERY = [
+  { q: "What does the color blue taste like?", a: ["Cool mint", "Blueberries, obviously", "Static electricity", "A cold bathtub"] },
+  { q: "How loud is a rainbow?", a: ["Whisper quiet", "A soft hum", "About as loud as a cat", "Bees inside a trumpet"] },
+  { q: "What does a Tuesday smell like?", a: ["Fresh laundry", "Old coffee", "Wet cardboard", "A microwaved ghost"] },
+  { q: "How much does a secret weigh?", a: ["Nothing at all", "About a feather", "A bag of rocks", "One sleepy walrus"] },
+  { q: "What does a nap sound like?", a: ["A soft zzz", "A fridge humming", "A ceiling fan", "Pudding falling downstairs"] },
+  { q: "What color is the number 7?", a: ["Green", "Purple", "Orange", "Plaid"] }
+];
 
 var CALLS = {
   CLUTCH: "Right +3, wrong −3. Push hard.",
@@ -252,12 +267,21 @@ var timerId = null;
 function fresh() {
   clearInterval(timerId);
   S = { phase: "draft", lane: 0, round: 0, lineup: [null, null, null], k: [3, 3, 3], rounds: [[], [], []],
-        calls: [[], [], []], honesty: [[], [], []], q: null, used: {} };
+        calls: [[], [], []], honesty: [[], [], []], q: null, used: {}, usedM: {},
+        imp: [0, 1, 2].map(function () { return Math.random() < 0.5 ? Math.floor(Math.random() * ROUNDS) : -1; }) };   // 0 or 1 mystery round a lane
 }
 function laneDone(i) { return S.rounds[i].length >= ROUNDS || S.k[i] === 1 || S.k[i] === 5; }
 function laneWinner(i) { return S.k[i] > 3 ? "you" : S.k[i] < 3 ? "ghost" : "tie"; }
 
-function pickQuestion(tag) {
+function pickMystery() {
+  var pool = MYSTERY.filter(function (_, i) { return !S.usedM[i]; });
+  if (!pool.length) pool = MYSTERY;
+  var item = pool[Math.floor(Math.random() * pool.length)];
+  S.usedM[MYSTERY.indexOf(item)] = true;
+  return { q: item.q, right: item.a[3], opts: shuffle(item.a), mystery: true };   // "right" = the ghost's pick: its weirdest option
+}
+function pickQuestion(tag, lane, round) {
+  if (S.imp[lane] === round) return pickMystery();
   var pool = QS[tag].filter(function (_, i) { return !S.used[tag + i]; });
   if (!pool.length) pool = QS[tag];
   var item = pool[Math.floor(Math.random() * pool.length)];
@@ -274,25 +298,71 @@ function bar(h, tag, dimArts) {
 }
 function bars(h) { return '<div class="bars">' + TAGS.map(function (t) { return bar(h, t, true); }).join("") + "</div>"; }
 
-// The board: a third of a wheel. Three lanes fan out over 120 degrees from a hub (your base) to the ghost's bases on the rim.
-// Each lane has 5 spaces; the marker starts on space 3 and moves one space per round toward whoever pushed more.
-var HUB = { x: 200, y: 215 }, ANG = [150, 90, 30], D0 = 30, CELL = 30, LEN = 5 * CELL;
-function pt(i, d, deg) {
-  var a = (deg === undefined ? ANG[i] : deg) * Math.PI / 180;
-  return { x: +(HUB.x + Math.cos(a) * d).toFixed(1), y: +(HUB.y - Math.sin(a) * d).toFixed(1) };
+// The board: a third of a wheel seen tilted from above. Three lanes fan out over 120 degrees from a hub (your base) to the
+// ghost's bases on the rim, each lane 5 raised tiles. Positions are worked out on a flat board (x right, y away from you)
+// and then squashed by TILT, with every tile given DEPTH pixels of side.
+// Each lane's marker starts on space 3 and moves one space per round toward whoever pushed more.
+var HUB = { x: 200, y: 205 }, ANG = [150, 90, 30], D0 = 30, CELL = 30, LEN = 5 * CELL, TILT = 0.55, DEPTH = 9;
+function flat(i, d, off) {
+  var a = ANG[i] * Math.PI / 180;
+  return { x: Math.cos(a) * d - Math.sin(a) * off, y: Math.sin(a) * d + Math.cos(a) * off };
+}
+function proj(p) { return { x: +(HUB.x + p.x).toFixed(1), y: +(HUB.y - p.y * TILT).toFixed(1) }; }
+function pts(a) { return a.map(function (p) { return p.x + "," + p.y; }).join(" "); }
+function slab(corners, on) {
+  var cls = "t" + (on ? " on" : ""), sides = "";
+  for (var j = 0; j < corners.length; j++) {
+    var p = corners[j], q = corners[(j + 1) % corners.length];
+    sides += '<polygon class="' + cls + '" points="' + pts([p, q, { x: q.x, y: q.y + DEPTH }, { x: p.x, y: p.y + DEPTH }]) + '"/>';
+  }
+  return '<g class="sd">' + sides + '</g><polygon class="' + cls + '" points="' + pts(corners) + '"/>';
+}
+function ring(cx, cy, r, n) {
+  var out = [];
+  for (var j = 0; j < n; j++) { var t = j / n * 2 * Math.PI; out.push(proj({ x: cx + Math.cos(t) * r, y: cy + Math.sin(t) * r })); }
+  return out;
+}
+// A tower beside a lane: a tall block with an orb on top, or a low stump once it has fallen. Flavor only, it changes no rules.
+function tower(i, d, down, side) {
+  var h = down ? 5 : 22, g = [flat(i, d - 7, 15), flat(i, d + 7, 15), flat(i, d + 7, 29), flat(i, d - 7, 29)].map(proj);
+  var t = g.map(function (p) { return { x: p.x, y: +(p.y - h).toFixed(1) }; });
+  var edges = [0, 1, 2, 3].sort(function (a, b) { return (g[a].y + g[(a + 1) % 4].y) - (g[b].y + g[(b + 1) % 4].y); });
+  var sides = edges.map(function (j) { var n = (j + 1) % 4; return '<polygon class="tw" points="' + pts([g[j], g[n], t[n], t[j]]) + '"/>'; }).join("");
+  var cx = (t[0].x + t[2].x) / 2, cy = (t[0].y + t[2].y) / 2;
+  return '<g class="tws">' + sides + '</g><polygon class="tw top" points="' + pts(t) + '"/>' + (down ? "" : '<circle class="orb ' + side + '" cx="' + cx.toFixed(1) + '" cy="' + (cy - 3).toFixed(1) + '" r="3.5"/>');
 }
 function isNow(i) { return (S.phase === "call" || S.phase === "question" || S.phase === "reveal") && S.lane === i; }
 function renderBoard() {
-  var svg = TODAY.map(function (tag, i) {
-    var k = S.k[i];
-    var a = pt(i, D0), b = pt(i, D0 + LEN), m = pt(i, D0 + CELL * (k - 0.5)), f = pt(i, D0 + CELL * k), g = pt(i, D0 + LEN + 24);
-    return '<g class="fan c-' + tag + (isNow(i) ? " now" : "") + '">' +
-      '<line class="cells" x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '"/>' +
-      '<line class="cells on" x1="' + a.x + '" y1="' + a.y + '" x2="' + f.x + '" y2="' + f.y + '"/>' +
-      '<circle class="mk" cx="' + m.x + '" cy="' + m.y + '" r="10"/>' +
-      '<circle class="gh" cx="' + g.x + '" cy="' + g.y + '" r="17"/>' +
-      '<text x="' + g.x + '" y="' + g.y + '" text-anchor="middle" dominant-baseline="central" font-size="19">' + (S.rounds[i].length ? hero(GHOST[i].hero).e : "?") + "</text></g>";
-  }).join("");
+  var floor = [proj({ x: 0, y: 0 })];
+  for (var a = 150; a >= 30; a -= 10) floor.push(proj({ x: Math.cos(a * Math.PI / 180) * 212, y: Math.sin(a * Math.PI / 180) * 212 }));
+  var tiles = [{ y: 0, html: '<g class="hubg">' + slab(ring(0, 0, 26, 18), false) + '<text class="hubt" x="' + HUB.x + '" y="' + (HUB.y - 1) + '" text-anchor="middle" dominant-baseline="central">YOU</text></g>' }];
+  var tokens = [];
+  TODAY.forEach(function (tag, i) {
+    var k = S.k[i], wrap = function (h) { return '<g class="fan c-' + tag + (isNow(i) ? " now" : "") + '">' + h + "</g>"; };
+    for (var j = 1; j <= 5; j++) {
+      var d0 = D0 + (j - 1) * CELL + 2, d1 = D0 + j * CELL - 2;
+      var c = [flat(i, d0, -11), flat(i, d1, -11), flat(i, d1, 11), flat(i, d0, 11)].map(proj);
+      tiles.push({ y: flat(i, (d0 + d1) / 2, 0).y, html: wrap(slab(c, j <= k)) });
+    }
+    var pad = flat(i, D0 + LEN + 24, 0);
+    var over = laneDone(i) && S.rounds[i].length, win = laneWinner(i);
+    tiles.push({ y: flat(i, D0 + 15, 22).y, html: wrap(tower(i, D0 + 15, over && win === "ghost", "me")) });
+    tiles.push({ y: flat(i, D0 + LEN - 15, 22).y, html: wrap(tower(i, D0 + LEN - 15, over && win === "you", "gh")) });
+    for (var cj = 1; cj <= 5; cj++) {
+      if (cj === k) continue;
+      [-5, 5].forEach(function (o) {
+        var fp = flat(i, D0 + (cj - 0.5) * CELL, o), sp = proj(fp);
+        tokens.push({ y: fp.y, html: wrap('<ellipse class="shadow" cx="' + sp.x + '" cy="' + sp.y + '" rx="4" ry="2"/><circle class="creep ' + (cj < k ? "me" : "gh") + '" cx="' + sp.x + '" cy="' + (sp.y - 5) + '" r="3.5"/>') });
+      });
+    }
+    tiles.push({ y: pad.y, html: wrap(slab(ring(pad.x, pad.y, 18, 14), false)) });
+    var m = proj(flat(i, D0 + CELL * (k - 0.5), 0)), g = proj(pad);
+    tokens.push({ y: flat(i, D0 + CELL * (k - 0.5), 0).y, html: wrap('<ellipse class="shadow" cx="' + m.x + '" cy="' + m.y + '" rx="9" ry="4.5"/><circle class="mk" cx="' + m.x + '" cy="' + (m.y - 9) + '" r="9"/>') });
+    tokens.push({ y: pad.y, html: wrap('<text x="' + g.x + '" y="' + (g.y - 9) + '" text-anchor="middle" dominant-baseline="central" font-size="22">' + (S.rounds[i].length ? hero(GHOST[i].hero).e : "?") + "</text>") });
+  });
+  var byFar = function (a, b) { return b.y - a.y; };
+  var svg = '<polygon class="floor" points="' + pts(floor) + '"/>' +
+    tiles.sort(byFar).map(function (t) { return t.html; }).join("") + tokens.sort(byFar).map(function (t) { return t.html; }).join("");
   var rows = TODAY.map(function (tag, i) {
     var hid = S.lineup[i];
     var me = hid ? hero(hid).e + " " + hero(hid).name : "—";
@@ -305,10 +375,7 @@ function renderBoard() {
       '<span class="label">space ' + S.k[i] + " of 5 · " + state + "</span></div>" +
       '<div class="lane-foot"><span>you: <b>' + me + '</b></span><span>ghost: <b>' + gh + "</b></span></div></div>";
   }).join("");
-  $board.innerHTML = '<div class="panel"><svg class="fanboard" viewBox="-10 0 420 240" role="img" aria-label="Three lanes fanning out from your base to the ghost\'s bases">' +
-    '<path class="wedge" d="M' + HUB.x + ' ' + HUB.y + ' L' + pt(0, 212, 150).x + ' ' + pt(0, 212, 150).y + ' A212 212 0 0 1 ' + pt(0, 212, 30).x + ' ' + pt(0, 212, 30).y + ' Z"/>' +
-    '<circle class="hub" cx="' + HUB.x + '" cy="' + HUB.y + '" r="26"/>' +
-    '<text x="' + HUB.x + '" y="' + HUB.y + '" text-anchor="middle" dominant-baseline="central" class="hubt">YOU</text>' + svg + "</svg>" + rows + "</div>";
+  $board.innerHTML = '<div class="panel"><svg class="fanboard" viewBox="-10 50 420 185" role="img" aria-label="Three lanes of five tiles fanning out from your base to the ghost\'s bases, seen from above">' + svg + "</svg>" + rows + "</div>";
 }
 
 function renderDraft() {
@@ -349,7 +416,7 @@ function renderQuestion() {
   $stage.innerHTML =
     '<div class="seed c-' + tag + '"><span class="lane-name">' + LABEL[tag] + " · round " + (S.round + 1) + '</span><span class="label">called <span class="tag k-' + S.calls[S.lane][S.round] + '">' + S.calls[S.lane][S.round] + "</span></span></div>" +
     '<div class="timer c-' + tag + '"><div id="tbar"></div></div>' +
-    '<div class="q">' + q.q + "</div>" +
+    '<div class="q">' + q.q + "</div>" + (q.mystery ? '<div class="note">Mystery: there is no right answer. You score if you match the ghost\'s sealed pick.</div>' : "") +
     '<div class="opts">' + q.opts.map(function (o, i) { return '<button class="opt" data-act="answer" data-i="' + i + '">' + o + "</button>"; }).join("") + "</div>";
   var end = Date.now() + TIME * 1000, bar = document.getElementById("tbar");
   clearInterval(timerId);
@@ -365,7 +432,9 @@ function renderReveal() {
   var call = S.calls[i][ri], done = laneDone(i), w = laneWinner(i);
   var verdict = r.step > 0 ? "You push the lane" : r.step < 0 ? "Ghost pushes back" : "Held";
   if (done) verdict = w === "you" ? "You take the lane" : w === "ghost" ? "Ghost takes the lane" : "Lane tied";
-  var answered = r.pick === null ? "Time's up. It was " + S.q.right + "." : (r.right ? "Correct: " + S.q.right : "Wrong. It was " + S.q.right + ".");
+  var answered = S.q.mystery
+    ? (r.pick === null ? "Time's up. " : "") + "No right answer. The ghost picked " + S.q.right + (r.right ? ": you matched it." : ": you didn't match it.")
+    : r.pick === null ? "Time's up. It was " + S.q.right + "." : (r.right ? "Correct: " + S.q.right : "Wrong. It was " + S.q.right + ".");
   var last = i === 2;
   $stage.innerHTML =
     '<div class="label">Round ' + (ri + 1) + " of " + ROUNDS + '</div>' +
@@ -375,10 +444,10 @@ function renderReveal() {
       '<div class="side"><span class="who">You</span><span class="crit ' + (r.step > 0 ? "win" : r.step < 0 ? "lose" : "") + '">' + me.e + '</span><span class="hn">' + me.name + '</span><span class="line"><span class="tag k-' + call + '">' + call + "</span> · " + LABEL[tag] + " " + me.w[tag] + "/3 · ×" + (1 + match(me, tag)).toFixed(1) + '</span><span class="pushv ' + cls(r.mine) + '">' + fmt(r.mine) + "</span></div>" +
       '<div class="side"><span class="who">Ghost</span><span class="crit ' + (r.step < 0 ? "win" : r.step > 0 ? "lose" : "") + '">' + gh.e + '</span><span class="hn">' + gh.name + '</span><span class="line"><span class="tag k-' + g.call + '">' + g.call + "</span> · " + LABEL[tag] + " " + gh.w[tag] + "/3 · ×" + (1 + match(gh, tag)).toFixed(1) + " · " + (g.right ? "right" : "wrong") + '</span><span class="pushv ' + cls(r.theirs) + '">' + fmt(r.theirs) + "</span></div>" +
     "</div>" +
-    '<div><div class="label" style="margin-bottom:8px">How did you get it? (no points either way)</div><div class="chips">' +
+    (S.q.mystery ? '<div class="note">Nothing to look up on this one.</div>' : '<div><div class="label" style="margin-bottom:8px">How did you get it? (no points either way)</div><div class="chips">' +
       ["I knew it", "I guessed", "I looked it up"].map(function (t, k) {
         return '<button class="chip" data-act="honest" data-k="' + k + '" aria-pressed="' + (S.honesty[i][ri] === k) + '">' + t + "</button>";
-      }).join("") + "</div></div>" +
+      }).join("") + "</div></div>") +
     '<button class="btn" data-act="next">' + (!done ? "Next round" : last ? "See result" : "Next lane") + "</button>";
 }
 
@@ -438,7 +507,7 @@ document.addEventListener("click", function (e) {
     S.phase = "call"; S.lane = 0; S.round = 0;
   } else if (act === "call") {
     S.calls[S.lane][S.round] = b.getAttribute("data-k");
-    S.q = pickQuestion(TODAY[S.lane]);
+    S.q = pickQuestion(TODAY[S.lane], S.lane, S.round);
     S.phase = "question";
   } else if (act === "answer") {
     resolve(+b.getAttribute("data-i")); return;
