@@ -19,9 +19,7 @@
   --def: #5aa7ff;
   --str: #ff9d6c;
   --int: #4fd1c5;
-  --clutch: #ff7a45;
   --feed: #5fd38d;
-  --tilt: #c58cff;
   --bad: #ff6b6b;
   --f-display: "Chakra Petch", "Arial Narrow", sans-serif;
   --f-body: "IBM Plex Sans", system-ui, sans-serif;
@@ -89,14 +87,6 @@ h1 { font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-hei
 /* controls */
 .btn { background: var(--fg); color: var(--ink); border: 0; border-radius: 8px; font: 700 16px var(--f-display); letter-spacing: .06em; text-transform: uppercase; padding: 14px 16px; cursor: pointer; width: 100%; }
 .btn[disabled] { opacity: .35; cursor: not-allowed; }
-.calls { display: grid; gap: 8px; }
-.call { display: grid; grid-template-columns: 92px 1fr; gap: 10px; align-items: center; text-align: left; background: var(--panel-2); border: 1px solid var(--line); border-left: 4px solid var(--cc); border-radius: 8px; padding: 12px; color: var(--fg); font: inherit; cursor: pointer; }
-.call:hover { border-color: var(--cc); }
-.call:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
-.call b { font: 700 18px var(--f-display); letter-spacing: .06em; color: var(--cc); }
-.call span { font: 400 12px/1.4 var(--f-mono); color: var(--mute); }
-.k-CLUTCH { --cc: var(--clutch); } .k-FEED { --cc: var(--feed); } .k-TILT { --cc: var(--tilt); }
-.tag { color: var(--cc); font-family: var(--f-display); font-weight: 700; letter-spacing: .06em; }
 
 .q { font: 600 20px/1.3 var(--f-body); text-wrap: balance; }
 .timer { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
@@ -125,7 +115,7 @@ h1 { font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-hei
 .fanboard { width: calc(100% + 20px); margin: -6px -10px 0; height: auto; display: block; }
 .fanboard .floor { fill: var(--panel-2); opacity: .5; stroke: var(--line); stroke-width: 1; }
 .fan { opacity: .6; }
-.fan.now { opacity: 1; }
+.fan.now, .fan.twr { opacity: 1; }   /* the towers are never dimmed */
 .fanboard .t { fill: var(--line); stroke: var(--ink); stroke-width: 1; stroke-linejoin: round; }
 .fan .t.on { fill: var(--lc); }
 .hubg .t { fill: var(--panel-2); stroke: var(--line); }
@@ -150,7 +140,7 @@ h1 { font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-hei
   </header>
   <section id="board" aria-label="Lanes"></section>
   <main id="stage" class="panel" aria-live="polite"></main>
-  <div class="ver">v0.4.1</div>
+  <div class="ver">v0.5</div>
 </div>
 
 <script src="engine/lanes.js"></script>
@@ -161,8 +151,8 @@ var TODAY = LANES.LANES;
 var LABEL = { def: "DEF · History", str: "STR · Body, Moon & Earth", int: "INT · Science & Tech" };
 var SHORT = { def: "DEF", str: "STR", int: "INT" };
 var ACTION = {
-  def: "A right answer pushes forward by your call and puts a shield on any lane: it blocks the next wave there. Reach space 5 to take the tower.",
-  str: "A right answer pushes forward by your call. Reach space 5 to take the tower.",
+  def: "A right answer pushes forward 2 and puts a shield on any lane: it blocks the next wave there. Reach space 5 to take the tower.",
+  str: "A right answer pushes forward 2. Reach space 5 to take the tower.",
   int: "A right answer heals +1 here, or your lowest lane once this one has its tower. Reach space 5 to take the tower."
 };
 var SEED = "3f9a·c07e·51b2";
@@ -220,12 +210,6 @@ var MYSTERY = [
   { q: "Name a chore you'd want a robot to do.", a: [["Dishes", 35], ["Laundry", 31], ["Clean the bathroom", 10], ["Vacuum", 10]] }
 ];
 
-var CALLS = {
-  CLUTCH: "Right +2, wrong −2. Push hard.",
-  FEED: "Right +1, wrong 0. Play safe.",
-  TILT: "Right: coin flip, +3 or −1. Wrong −1."
-};
-
 // ---- helpers ----
 function shuffle(a) {
   a = a.slice();
@@ -241,7 +225,7 @@ var timerId = null;
 function fresh() {
   clearInterval(timerId);
   S = { phase: "draft", lane: 0, round: 0, lineup: [null, null, null], st: LANES.fresh(), rounds: [[], [], []],
-        calls: [[], [], []], honesty: [[], [], []], q: null, used: {}, usedM: {}, pending: null };
+        honesty: [[], [], []], q: null, used: {}, usedM: {}, pending: null };
 }
 function laneDone(i) { return S.rounds[i].length >= ROUNDS; }
 function laneWon(i) { return LANES.won(S.st, i); }
@@ -301,7 +285,7 @@ function tower(i, d, down, side) {
   var cx = (t[0].x + t[2].x) / 2, cy = (t[0].y + t[2].y) / 2;
   return '<g class="tws">' + sides + '</g><polygon class="tw top" points="' + pts(t) + '"/>' + (down ? "" : '<circle class="orb ' + side + '" cx="' + cx.toFixed(1) + '" cy="' + (cy - 3).toFixed(1) + '" r="3.5"/>');
 }
-function isNow(i) { return (S.phase === "call" || S.phase === "question" || S.phase === "shield" || S.phase === "reveal") && S.lane === i; }
+function isNow(i) { return (S.phase === "question" || S.phase === "shield" || S.phase === "reveal") && S.lane === i; }
 function laneState(i) {
   if (laneWon(i)) return "tower taken";
   if (laneDone(i)) return "done";
@@ -313,7 +297,7 @@ function renderBoard() {
   var tiles = [{ y: 0, html: '<g class="hubg">' + slab(ring(0, 0, 26, 18), false) + '<text class="hubt" x="' + HUB.x + '" y="' + (HUB.y - 1) + '" text-anchor="middle" dominant-baseline="central">GOAL</text></g>' }];
   var tokens = [];
   TODAY.forEach(function (tag, i) {
-    var k = S.st.k[i], wrap = function (h) { return '<g class="fan c-' + tag + (isNow(i) ? " now" : "") + '">' + h + "</g>"; };
+    var k = S.st.k[i], wrap = function (h, twr) { return '<g class="fan c-' + tag + (isNow(i) ? " now" : "") + (twr ? " twr" : "") + '">' + h + "</g>"; };
     for (var j = 1; j <= 5; j++) {
       var d0 = D0 + (j - 1) * CELL + 2, d1 = D0 + j * CELL - 2;
       var c = [flat(i, d0, -HALF), flat(i, d1, -HALF), flat(i, d1, HALF), flat(i, d0, HALF)].map(proj);
@@ -321,8 +305,8 @@ function renderBoard() {
     }
     var pad = flat(i, D0 + LEN + PAD_R + 6, 0);
     var taken = laneWon(i);
-    tiles.push({ y: flat(i, D0 + 15, HALF + 11).y, html: wrap(tower(i, D0 + 15, taken, "far")) });          // the goal's tower, by the hub
-    tiles.push({ y: flat(i, D0 + LEN - 15, HALF + 11).y, html: wrap(tower(i, D0 + LEN - 15, false, "me")) });   // your tower, out at the edge
+    tiles.push({ y: flat(i, D0 + 15, HALF + 11).y, html: wrap(tower(i, D0 + 15, taken, "far"), true) });          // the goal's tower, by the hub
+    tiles.push({ y: flat(i, D0 + LEN - 15, HALF + 11).y, html: wrap(tower(i, D0 + LEN - 15, false, "me"), true) });   // your tower, out at the edge
     for (var cj = 1; cj <= 5; cj++) {
       if (cj === k) continue;
       [-10, 10].forEach(function (o) {
@@ -372,21 +356,11 @@ function renderDraft() {
     '<button class="btn" data-act="lock"' + (picked < 3 ? " disabled" : "") + ">Lock lineup</button>";
 }
 
-function renderCall() {
-  var tag = TODAY[S.lane];
-  $stage.innerHTML =
-    '<div class="lane c-' + tag + '"><span class="lane-name">' + LABEL[tag] + " · round " + (S.round + 1) + " of " + ROUNDS + "</span></div>" +
-    "<h2>Commit a call</h2>" +
-    '<div class="note">You see the question after you commit. ' + ACTION[tag] + "</div>" +
-    '<div class="calls">' + Object.keys(CALLS).map(function (k) {
-      return '<button class="call k-' + k + '" data-act="call" data-k="' + k + '"><b>' + k + "</b><span>" + CALLS[k] + "</span></button>";
-    }).join("") + "</div>";
-}
-
 function renderQuestion() {
   var tag = TODAY[S.lane], q = S.q;
   $stage.innerHTML =
-    '<div class="seed c-' + tag + '"><span class="lane-name">' + SHORT[tag] + " · round " + (S.round + 1) + '</span><span class="label">called <span class="tag k-' + S.calls[S.lane][S.round] + '">' + S.calls[S.lane][S.round] + "</span></span></div>" +
+    '<div class="seed c-' + tag + '"><span class="lane-name">' + LABEL[tag] + " · round " + (S.round + 1) + " of " + ROUNDS + "</span></div>" +
+    (S.round === 0 ? '<div class="note">' + ACTION[tag] + "</div>" : "") +
     '<div class="timer c-' + tag + '"><div id="tbar"></div></div>' +
     '<div class="q">' + q.q + "</div>" + (q.mystery ? '<div class="note">Crowd round: there is no right answer. You score if you match the crowd.</div>' : "") +
     '<div class="opts">' + q.opts.map(function (o, i) { return '<button class="opt" data-act="answer" data-i="' + i + '">' + o + "</button>"; }).join("") + "</div>";
@@ -418,7 +392,7 @@ function renderShield() {
 
 function renderReveal() {
   var i = S.lane, ri = S.round, tag = TODAY[i], r = S.rounds[i][ri], ev = r.ev, me = hero(S.lineup[i]);
-  var call = S.calls[i][ri], done = laneDone(i), moved = ev.to[i] - ev.from[i];
+  var done = laneDone(i), moved = ev.to[i] - ev.from[i];
   var verdict = ev.shield !== undefined ? (moved > 0 ? "Pushed, shield on " : "Shield on ") + SHORT[TODAY[ev.shield]]
     : ev.healed !== undefined ? "Healed " + SHORT[TODAY[ev.healed]] + " +1"
     : ev.blocked ? "Wave blocked"
@@ -429,9 +403,9 @@ function renderReveal() {
   $stage.innerHTML =
     '<div class="label">Round ' + (ri + 1) + " of " + ROUNDS + '</div>' +
     '<div class="verdict c-' + tag + '">' + verdict + "</div>" +
-    '<div class="note">' + answeredLine(r) + (call === "TILT" && ev.right && tag !== "int" ? " TILT landed " + (r.heads ? "heads (+3)." : "tails (−1).") : "") + how + " Marker on space " + S.st.k[i] + " of 5.</div>" +
+    '<div class="note">' + answeredLine(r) + how + " Marker on space " + S.st.k[i] + " of 5.</div>" +
     '<div class="cols">' +
-      '<div class="side"><span class="who">You</span><span class="crit ' + (moved > 0 || ev.shield !== undefined || ev.healed !== undefined ? "win" : moved < 0 ? "lose" : "") + '">' + me.e + '</span><span class="hn">' + me.name + '</span><span class="line"><span class="tag k-' + call + '">' + call + "</span> · " + SHORT[tag] + '</span><span class="pushv ' + cls(moved) + '">' + fmt(moved) + "</span></div>" +
+      '<div class="side"><span class="who">You</span><span class="crit ' + (moved > 0 || ev.shield !== undefined || ev.healed !== undefined ? "win" : moved < 0 ? "lose" : "") + '">' + me.e + '</span><span class="hn">' + me.name + '</span><span class="line">' + SHORT[tag] + '</span><span class="pushv ' + cls(moved) + '">' + fmt(moved) + "</span></div>" +
     "</div>" +
     (S.q.mystery ? '<div class="note">Nothing to look up on this one.</div>' : '<div><div class="label" style="margin-bottom:8px">How did you get it? (no points either way)</div><div class="chips">' +
       ["I knew it", "I guessed", "I looked it up"].map(function (t, k) {
@@ -457,7 +431,6 @@ function renderResult() {
 function render() {
   renderBoard();
   if (S.phase === "draft") renderDraft();
-  else if (S.phase === "call") renderCall();
   else if (S.phase === "question") renderQuestion();
   else if (S.phase === "shield") renderShield();
   else if (S.phase === "reveal") renderReveal();
@@ -465,16 +438,17 @@ function render() {
 }
 
 // ---- actions ----
+function ask() { S.q = pickQuestion(TODAY[S.lane], S.lane, S.round); S.phase = "question"; }
 function playRound(r, shieldLane) {
   var i = S.lane, ri = S.round;
-  r.ev = LANES.play(S.st, i, S.calls[i][ri], r.right, r.heads, shieldLane);
+  r.ev = LANES.play(S.st, i, r.right, shieldLane);
   S.rounds[i].push(r);
   S.pending = null;
   S.phase = "reveal";
 }
 function resolve(pick) {
   clearInterval(timerId);
-  var r = { pick: pick, right: pick !== null && S.q.opts[pick] === S.q.right, heads: Math.random() < 0.5 };
+  var r = { pick: pick, right: pick !== null && S.q.opts[pick] === S.q.right };
   if (r.right && TODAY[S.lane] === "def") { S.pending = r; S.phase = "shield"; }
   else playRound(r);
   render();
@@ -492,11 +466,7 @@ document.addEventListener("click", function (e) {
     if (S.phase !== "draft") return;
     S.lineup[+b.getAttribute("data-i")] = null;
   } else if (act === "lock") {
-    S.phase = "call"; S.lane = 0; S.round = 0;
-  } else if (act === "call") {
-    S.calls[S.lane][S.round] = b.getAttribute("data-k");
-    S.q = pickQuestion(TODAY[S.lane], S.lane, S.round);
-    S.phase = "question";
+    S.lane = 0; S.round = 0; ask();
   } else if (act === "answer") {
     resolve(+b.getAttribute("data-i")); return;
   } else if (act === "shield") {
@@ -504,9 +474,9 @@ document.addEventListener("click", function (e) {
   } else if (act === "honest") {
     S.honesty[S.lane][S.round] = +b.getAttribute("data-k");
   } else if (act === "next") {
-    if (!laneDone(S.lane)) { S.round++; S.phase = "call"; }
+    if (!laneDone(S.lane)) { S.round++; ask(); }
     else if (S.lane === 2) S.phase = "result";
-    else { S.lane++; S.round = 0; S.phase = "call"; }
+    else { S.lane++; S.round = 0; ask(); }
   } else if (act === "again") {
     fresh();
   }
