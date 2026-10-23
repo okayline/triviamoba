@@ -3,8 +3,14 @@
 TriviaMoba: trivia in three MOBA lanes, a game in the Dungeons family. Design notes: "Lane Game: Design Notes" (working title in that doc). Not Trivial Pursuit's look or name: that is Hasbro's.
 
 - **Push only when the user says to.** The Worker `triviamoba` is connected to this repo, so a push to `main` is a release.
-- **Prototype state:** one static page, `public/index.html`, with sample heroes, questions and a scripted ghost. The rules (scoring, 5-space lanes, 3 rounds a lane) are in the script at the bottom of that file; change a rule there, once.
-- No new dependencies without asking. Times in changelogs are Hawaii time (HST).
+- **The page** is one file, `public/index.html`, with sample heroes and trivia questions, the crowd rounds' 10 prompts, and a scripted ghost (on the board only; the bottom panels never mention it). The lane rules (scoring, 5-space lanes, rounds a lane) are in the script at the bottom of that file; change a rule there, once. The page doesn't call the API yet.
+- **The crowd rules live in one file**, `public/engine/crowd.js` (prompts and starting counts, the day's pick, answer keys, the word filter), loaded by the Worker and the tests. Prompts and counts are from ProtoQA (CC BY 4.0): keep the credit in README.md.
+- **The backend** (`src/worker.js`, `src/ledger.js`, `src/registry.js` copied from moba-beat) uses the moba-beat D1 and shares SCATTER.EXE's `scatter_players`, `scatter_rate_limits` and `scatter_ledger` chain; TriviaMoba's own data is `scatter_writes`, `scatter_counts` and the ledger kinds `crowd` and `write`. Never touch SCATTER.EXE's `scatter_sheets` or its `day`/`sheet` entries. Don't weaken `prev_hash UNIQUE`. Records hold player ids, never names.
+- **The day's pick** comes from the shared registry's head at 00:00 UTC (as moba-beat), sealed in the day's `crowd` entry with the crowd counts frozen.
+- **Database changes** need a file in `migrations/`, `schema.sql` updated to match, and the live moba-beat D1 migrated before the push that needs it.
+- **Keep testing quick**: `npm test` must pass before any commit, plus one quick check of whatever changed. Expected values come from hand-worked examples or node:crypto, not the code under test.
+- **No bad vibes**: no negative questions, answers or headlines.
+- Every release bumps the version in `public/index.html` (`<div class="ver">`) and adds a `CHANGELOG.md` entry (a test checks they match), plus the detailed dev entry in dungeon-notes `triviamoba/changelog-v0.1.md`. No new dependencies without asking. Times in changelogs are Hawaii time (HST). No browser popups.
 
 ## Working rules
 
