@@ -4,6 +4,63 @@ Newest first. Times are Hawaii time (HST). The page shows its version in the low
 
 ---
 
+## v0.18
+**Fri Oct 23, 2026 · 7:12 AM HST** (no migration; nothing new to run)
+
+- The thin axis line moves from Neptune to Uranus, at the owner’s request. Neptune’s picture is back to the plain photo. Uranus’s picture gets a thin light line sticking out of its two poles (about 22 px each, outside the ball only). It leans 14.5° from straight up, because the ring in the photo slopes about 14.5° (measured by tracing the ring’s two ends) and the axis stands square to the ring. It is not the real tilt: Wikipedia’s Uranus article gives 82.23° to its orbit, which would run the line along the ring. Removed: the v0.17 Neptune picture (with the 28.32° line) and the v0.12 Uranus picture (without a line).
+
+---
+
+## v0.17
+**Fri Oct 23, 2026 · 7:02 AM HST** (no migration; nothing new to run)
+
+- Neptune’s axis line now leans 28.32° from straight up, Neptune’s real axial tilt to its orbit (Wikipedia’s Neptune article, from NASA’s planetary fact sheet), at the owner’s request. Removed: the v0.16 picture, where the line leaned 15° (my guess). The lean is to the right as in v0.16; which way the real tilt leans in the photo is not known.
+
+---
+
+## v0.16
+**Fri Oct 23, 2026 · 6:55 AM HST** (no migration; nothing new to run)
+
+- Neptune’s picture gets a thin light axis line sticking out of its north and south poles (about 22 px each, outside the ball only), leaning 15° to the right to show it tilted, at the owner’s request. The 15° is my choice, not measured from the photo. Removed: the v0.12 Neptune picture without the line.
+
+---
+
+## v0.15
+**Fri Oct 23, 2026 · 6:47 AM HST** (no migration; nothing new to run)
+
+- Mercury’s picture is made 60% of Earth’s width (about 124 px against Earth’s about 207 px) at the owner’s request, and the part of the ball that was cut off straight at the bottom of the original photo (about 9 px) and the sliver cut off at the top (about 1 px) are filled in by mirroring the surface rows next to the cut, so it is a whole round ball. The fill is not part of the original photo. The real ratio is 38%, so this is bigger than to scale. Removed: the v0.14 Mercury picture (50%, still cut off at the bottom).
+
+---
+
+## v0.14
+**Fri Oct 23, 2026 · 6:43 AM HST** (no migration; nothing new to run)
+
+- Mercury’s picture is made 50% of Earth’s width (about 104 px against Earth’s about 207 px) at the owner’s request. The real ratio is 38% (4,878 km against 12,742 km, from Wikidata), so this is bigger than to scale. Removed: the v0.13 Mercury picture (38%).
+
+---
+
+## v0.13
+**Fri Oct 23, 2026 · 6:43 AM HST** (no migration; nothing new to run)
+
+- Mercury’s picture is now to scale with Earth’s in the sheet: Mercury is 38% of Earth’s width (diameters 4,878 km and 12,742 km, from Wikidata), so its ball is about 80 px wide against Earth’s about 207 px. Removed: the full-frame Mercury picture (replaced by the smaller one). The other planets in the sheet are not changed and are not to scale with each other, as the sheet’s maker drew them.
+
+---
+
+## v0.12
+**Fri Oct 23, 2026 · 6:39 AM HST** (no migration; nothing new to run)
+
+- INT gets 8 picture questions, "Which planet is this?", each a picture of one planet (Earth, Jupiter, Uranus, Mars, Venus, Neptune, Saturn, Mercury) with four planet names. The pictures are cropped from a sheet the owner sent (`public/img/`, named by a hash so a file name never gives the answer; where the sheet comes from and its licence are not known). A question can now carry a picture: `POST /api/deal` sends `img` and the page shows it above the question. Removed: nothing (INT's 5 text questions are still there).
+
+---
+
+## v0.11
+**Fri Oct 23, 2026 · 6:20 AM HST** (needs migration 002 run on the moba-beat database before the push: `npx wrangler d1 execute moba-beat --remote --file=migrations/002_deals.sql`)
+
+- The server now keeps the answers. Each round the page asks `POST /api/deal` for a question (the text and its four options, no answer) and sends the pick to `POST /api/answer`, which says if it was right and shows the right answer. The server starts a clock when it sends a question and allows 15 seconds plus 5 for lag; a pick later than that counts as time's up. A question can be answered once (asked again, it gives back the first result), and a "time's up" can't come early to peek at the answer. A player gets all of a lane's questions before any repeats. Deals are limited to 600 an hour from one place. New table `scatter_deals` (`migrations/002_deals.sql`). The page shows "One moment…" while it waits, and "Try again" if a try didn't get through.
+- The questions and answers moved to `src/questions.js` (the Worker; nothing in `public/` holds them). Removed: the 15 questions and their answers in the page, the page's own question picking, shuffling and right/wrong check, `S.used`, and the page's 15-second constant (the server sends the time).
+
+---
+
 ## v0.10
 **Fri Oct 23, 2026 · 6:08 AM HST** (no migration; needs `DAILY_SECRET`, as v0.9)
 

@@ -10,13 +10,20 @@
 //   POST /api/write {day, answers: [2]}  seal your two answers on the ledger, once a day. Blank is allowed; an answer
 //                                        with a blocked word is refused. They add to the counts, which only show in a
 //                                        later day's crowd entry.
+//   POST /api/deal {lane: 0-2}           { deal, q, img?, opts: [4 texts], time }: a question for that lane, without its answer (img is a picture in public/img/).
+//                                        The time it was sent starts the clock (TIME + GRACE seconds, src/questions.js).
+//   POST /api/answer {deal, pick}        { right, answer, late }: checks your pick (its place in opts, or null when time ran
+//                                        out) once, and shows the right answer. A pick after TIME + GRACE counts as time's
+//                                        up (late: true). Asked again, it gives back what was saved.
 //
-// The rules are public/engine/crowd.js, the same file the page loads. The day's seed is made with the Worker secret
+// The questions and their answers are src/questions.js and are never sent before they are answered. The crowd rules are public/engine/crowd.js, the same file the page loads. The day's seed is made with the Worker secret
 // DAILY_SECRET (src/ledger.js daySeed) and never leaves the Worker; the day's entry holds only its hash.
 
 import { sha256, head, writeInsert, crowdDay, daySeed, isUnique } from "./ledger.js";
 import * as C from "../public/engine/crowd.js";
 import { registryHeadAt } from "./registry.js";
+import "../public/engine/lanes.js";   // sets globalThis.LANES: the lanes and their order (def, str, int)
+import { BANK, TIME, GRACE } from "./questions.js";
 
 const COOKIE = "tm";
 const COOKIE_MAX_AGE = 400 * 86400;
@@ -186,8 +193,65 @@ async function seedOf(req, env, url) {
   return json({ day, registry: rec.registry, seed, seed_hash: rec.seed_hash });
 }
 
+// ---------- questions ----------
+
+const rand = (n) => crypto.getRandomValues(new Uint32Array(1))[0] % n;
+const shuffled = (n) => {
+  const a = [...Array(n).keys()];
+  for (let i = n - 1; i > 0; i--) { const j = rand(i + 1); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+};
+const laneTag = (i) => globalThis.LANES.LANES[i];
+
+// Deal a question for a lane: one this player has had the fewest times (so all of a lane's questions come round before any
+// repeats), its options in a shuffled order, and no answer. The time it was sent starts the clock.
+async function deal(req, env) {
+  const b = await body(req);
+  if (!Number.isInteger(b.lane) || b.lane < 0 || b.lane >= globalThis.LANES.LANES.length) throw new Oops("Pick a lane.");
+  if (!(await rateLimit(env, req, "deal", 600, 3600))) throw new Oops("That's a lot of questions. Try again in a little while.", 429);
+  const { player, cookie } = await needPlayer(req, env);
+  const list = BANK[laneTag(b.lane)], t = now();
+  const had = new Map((await env.DB.prepare("SELECT q, COUNT(*) AS n FROM scatter_deals WHERE player_id = ? AND lane = ? GROUP BY q")
+    .bind(player.id, b.lane).all()).results.map((r) => [r.q, r.n]));
+  const fewest = Math.min(...list.map((_, i) => had.get(i) || 0));
+  const pool = list.map((_, i) => i).filter((i) => (had.get(i) || 0) === fewest);
+  const q = pool[rand(pool.length)], order = shuffled(list[q].a.length);
+  const row = await env.DB.prepare("INSERT INTO scatter_deals (player_id, lane, q, opts, sent_at) VALUES (?, ?, ?, ?, ?) RETURNING id")
+    .bind(player.id, b.lane, q, JSON.stringify(order), t).first();
+  if (Math.random() < 0.02) await env.DB.prepare("DELETE FROM scatter_deals WHERE sent_at < ?").bind(t - 86400).run();
+  return withCookie(json({ deal: row.id, q: list[q].q, ...(list[q].img ? { img: list[q].img } : {}), opts: order.map((i) => list[q].a[i]), time: TIME }), cookie);
+}
+
+// Check a pick, once. pick is the option's place in what was shown, or null when the page's time ran out. A pick that comes
+// in more than TIME + GRACE seconds after the question was sent is too late and counts as time's up. A question that was
+// already answered gives back what was saved, whatever is sent now (so a lost reply can be asked for again, and a second
+// try at the same question is never counted). The right answer is shown with the verdict, and never before.
+async function answer(req, env) {
+  const b = await body(req);
+  if (!Number.isInteger(b.deal)) throw new Oops("Which question?");
+  if (b.pick !== null && !Number.isInteger(b.pick)) throw new Oops("Pick one of the answers.");
+  const player = await findPlayer(req, env);
+  const get = () => env.DB.prepare("SELECT id, lane, q, opts, sent_at, answered_at, pick, late FROM scatter_deals WHERE id = ? AND player_id = ?")
+    .bind(b.deal, player.id).first();
+  let d = player && await get();
+  if (!d) throw new Oops("That question isn't yours, or it's gone.", 404);
+  const order = JSON.parse(d.opts), item = BANK[laneTag(d.lane)][d.q];
+  if (d.answered_at === null) {
+    const t = now(), waited = t - d.sent_at;
+    if (b.pick !== null && (b.pick < 0 || b.pick >= order.length)) throw new Oops("Pick one of the answers.");
+    if (b.pick === null && waited < TIME - 1) throw new Oops("The time isn't up yet.", 409);   // a quiet pick can't come early to peek at the answer
+    const late = b.pick !== null && waited > TIME + GRACE;
+    await env.DB.prepare("UPDATE scatter_deals SET pick = ?, late = ?, answered_at = ? WHERE id = ? AND answered_at IS NULL")
+      .bind(late ? null : b.pick, late ? 1 : 0, t, d.id).run();
+    d = await get();
+  }
+  return json({ right: d.pick !== null && order[d.pick] === 0, answer: item.a[0], late: d.late === 1 });
+}
+
 const ROUTES = {
   "GET /api/today": today,
   "GET /api/seed": seedOf,
   "POST /api/write": write,
+  "POST /api/deal": deal,
+  "POST /api/answer": answer,
 };

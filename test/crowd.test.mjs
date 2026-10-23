@@ -133,6 +133,7 @@ test("the migration adds exactly TriviaMoba's part of schema.sql on top of SCATT
   const scatter = readFileSync(new URL("../schema.sql", import.meta.url), "utf8").split("-- ---------- TriviaMoba")[0];
   migrated.exec(scatter);
   migrated.exec(readFileSync(new URL("../migrations/001_crowd.sql", import.meta.url), "utf8"));
+  migrated.exec(readFileSync(new URL("../migrations/002_deals.sql", import.meta.url), "utf8"));
   assert.deepEqual(cols(migrated).map((r) => r[0]), cols(full).map((r) => r[0]));
 });
 
