@@ -11,11 +11,6 @@ test("lanes are DEF, STR, INT; markers start on the start pad (0); no lane is wo
   assert.equal(L.winner(L.fresh()), -1);
 });
 
-test("crowd rounds: a lane's 2nd and 4th questions of every 5", () => {
-  const crowd = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(L.isCrowd);
-  assert.deepEqual(crowd, [false, true, false, true, false, false, true, false, true, false]);
-});
-
 test("STR: right pushes 2; space 5 takes the tower and ends the game", () => {
   const s = L.fresh();
   L.play(s, STR, true); L.play(s, STR, true); assert.equal(s.k[STR], 4);   // 0 + 2 + 2

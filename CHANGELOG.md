@@ -4,6 +4,27 @@ Newest first. Times are Hawaii time (HST). The page shows its version in the low
 
 ---
 
+## v0.10
+**Fri Oct 23, 2026 · 6:08 AM HST** (no migration; needs `DAILY_SECRET`, as v0.9)
+
+- `GET /api/seed?day=YYYY-MM-DD` shows a finished day's seed with its hash, so anyone can check that day's picks. It answers 403 for today or a later day, 404 for a day with no `seed_hash` on the ledger (every day sealed before v0.9), and never shows a seed that doesn't match its sealed hash. Removed: nothing.
+
+---
+
+## v0.9
+**Fri Oct 23, 2026 · 5:58 AM HST** (needs `DAILY_SECRET` set on the Worker before the push; no migration)
+
+- The day's picks now come from a secret seed: HMAC-SHA256 of the registry's head and the day, keyed with the Worker secret `DAILY_SECRET`, the same method as scoundrel.exe and Daily Pitch. The day's `crowd` entry gets a `seed_hash` (the SHA-256 of the seed) and the seed never leaves the Worker. Until `DAILY_SECRET` is set, `/api/today` answers 503. Removed: the public seed (SHA-256 of the day and the registry head), which anyone could recompute. Days already sealed keep their old picks and have no `seed_hash`.
+
+---
+
+## v0.8
+**Fri Oct 23, 2026 · 5:45 AM HST**
+
+- Crowd rounds are gone: every question is trivia with a right answer. Removed: the "match the crowd" rounds (a lane's 2nd and 4th questions of every 5), the 10 sample crowd prompts and their counts in the page, the crowd note on the question, the "No right answer. The crowd picked…" reveal line, `isCrowd`, `CYCLE` and `CROWD_ROUNDS` in `lanes.js`, and their test. The backend (crowd prompts, written answers, ProtoQA counts) is unchanged and no longer used by the page.
+
+---
+
 ## v0.7
 **Fri Oct 23, 2026 · 4:36 AM HST**
 

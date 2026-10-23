@@ -11,14 +11,10 @@
 (function () {
   var LANES = ["def", "str", "int"];
   var TOP = 5, START = 0, WAVE = 1, PUSH = 2, INT_PUSH = 1, HEAL = 1;   // 0 is the start pad
-  var CYCLE = 5, CROWD_ROUNDS = [1, 3];   // in each lane, its 2nd and 4th questions of every 5 are crowd rounds
 
   function fresh() { return { k: [START, START, START], shields: [0, 0, 0] }; }
   var clamp = function (n) { return Math.max(START, Math.min(TOP, n)); };
   function move(st, lane, by) { st.k[lane] = clamp(st.k[lane] + by); }
-
-  // Is this lane's n-th question (0 is the first) a crowd round?
-  function isCrowd(n) { return CROWD_ROUNDS.indexOf(n % CYCLE) >= 0; }
 
   // One round in `lane`. `target` is the lane a DEF right answer puts its shield on, or the lane an INT right answer heals. Returns what happened, for the reveal.
   function play(st, lane, right, target) {
@@ -43,7 +39,7 @@
   // The lane that ended the game, or -1 while it is still on.
   function winner(st) { for (var i = 0; i < st.k.length; i++) if (won(st, i)) return i; return -1; }
 
-  var api = { LANES: LANES, START: START, TOP: TOP, WAVE: WAVE, PUSH: PUSH, INT_PUSH: INT_PUSH, HEAL: HEAL, healGain: healGain, CYCLE: CYCLE, CROWD_ROUNDS: CROWD_ROUNDS,
-              fresh: fresh, play: play, isCrowd: isCrowd, won: won, winner: winner };
+  var api = { LANES: LANES, START: START, TOP: TOP, WAVE: WAVE, PUSH: PUSH, INT_PUSH: INT_PUSH, HEAL: HEAL, healGain: healGain,
+              fresh: fresh, play: play, won: won, winner: winner };
   globalThis.LANES = api;   // a plain script in the page; the tests import the file and read globalThis.LANES
 })();

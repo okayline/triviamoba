@@ -5,13 +5,16 @@
 //                                        the shared registry head the day was picked from,
 //                                        the two write prompts ({ id, q }), the crowd rounds ({ id, q, options: [a] },
 //                                        no counts), and your sealed answers, entry and hash if you wrote today.
+//   GET  /api/seed?day=YYYY-MM-DD        { day, registry, seed, seed_hash }: a finished day's seed, so anyone can check its
+//                                        picks. 403 for today or later, 404 for a day with no seed on the ledger.
 //   POST /api/write {day, answers: [2]}  seal your two answers on the ledger, once a day. Blank is allowed; an answer
 //                                        with a blocked word is refused. They add to the counts, which only show in a
 //                                        later day's crowd entry.
 //
-// The rules are public/engine/crowd.js, the same file the page loads.
+// The rules are public/engine/crowd.js, the same file the page loads. The day's seed is made with the Worker secret
+// DAILY_SECRET (src/ledger.js daySeed) and never leaves the Worker; the day's entry holds only its hash.
 
-import { sha256, head, writeInsert, crowdDay, isUnique } from "./ledger.js";
+import { sha256, head, writeInsert, crowdDay, daySeed, isUnique } from "./ledger.js";
 import * as C from "../public/engine/crowd.js";
 import { registryHeadAt } from "./registry.js";
 
@@ -108,9 +111,12 @@ async function body(req) {
 // ---------- the day ----------
 
 // The day's crowd entry. A registry that can't be read leaves the day unsealed; the next request tries again.
-const today_ = (env, day) => crowdDay(env.DB, day, () => registryHeadAt(day).catch((e) => {
-  console.error(e); throw new Oops("Today's questions aren't ready yet. Try again in a moment.", 503);
-}), now());
+const today_ = (env, day) => {
+  if (!env.DAILY_SECRET) { console.error("The Worker has no DAILY_SECRET set."); throw new Oops("Today's questions aren't ready yet. Try again in a moment.", 503); }
+  return crowdDay(env.DB, day, () => registryHeadAt(day).catch((e) => {
+    console.error(e); throw new Oops("Today's questions aren't ready yet. Try again in a moment.", 503);
+  }), now(), env.DAILY_SECRET);
+};
 
 // What the page sees: crowd rounds without their counts (the counts are on the ledger entry, for anyone who looks).
 async function view(env, player, day) {
@@ -165,7 +171,23 @@ async function write(req, env) {
   throw new Error("The ledger is busy. Try again.");
 }
 
+// A finished day's seed. It is made again from the secret and the registry head the day's entry holds, and shown only if
+// its hash is the seed_hash sealed on the ledger (a changed secret would give a seed that doesn't match, so it is never shown).
+async function seedOf(req, env, url) {
+  const day = url.searchParams.get("day") || "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || Number.isNaN(Date.parse(day + "T00:00:00Z"))) throw new Oops("Give a day like 2027-01-01.");
+  if (day >= utcDay()) throw new Oops("A day's seed is shown once the day is over.", 403);
+  if (!env.DAILY_SECRET) throw new Oops("Not available right now.", 503);
+  const got = await env.DB.prepare("SELECT record FROM scatter_ledger WHERE kind = 'crowd' AND day = ?").bind(day).first();
+  const rec = got && JSON.parse(got.record);
+  if (!rec || !rec.seed_hash) throw new Oops("No seed was sealed for that day.", 404);
+  const seed = await daySeed(env.DAILY_SECRET, day, rec.registry);
+  if ((await sha256(seed)) !== rec.seed_hash) throw new Error("The seed for " + day + " doesn't match its hash on the ledger.");
+  return json({ day, registry: rec.registry, seed, seed_hash: rec.seed_hash });
+}
+
 const ROUTES = {
   "GET /api/today": today,
+  "GET /api/seed": seedOf,
   "POST /api/write": write,
 };

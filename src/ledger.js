@@ -4,10 +4,12 @@
 //   hash = SHA-256( prev_hash + "|" + record )
 //
 // TriviaMoba writes two kinds of entry:
-//   crowd  { day, registry, write, crowd }: the shared registry's chain head at 00:00 UTC (src/registry.js), the day's
-//          two write prompt ids, and its crowd prompts with their counts frozen when the entry is sealed (crowd.js
-//          snapshot). The prompts are picked from SHA-256("triviamoba|" + day + "|" + registry): fixed at midnight, the
-//          same for everyone, recomputable by anyone, and nothing written after midnight can steer them.
+//   crowd  { day, registry, seed_hash, write, crowd }: the shared registry's chain head at 00:00 UTC (src/registry.js),
+//          the SHA-256 of the day's seed, the day's two write prompt ids, and its crowd prompts with their counts frozen
+//          when the entry is sealed (crowd.js snapshot). The day's seed is HMAC-SHA256(DAILY_SECRET, "triviamoba|" + day +
+//          "|" + registry) (same method as scoundrel.exe and Daily Pitch): fixed at midnight, the same for everyone, and
+//          nobody can work it out without the secret. seed_hash on the ledger lets the seed be checked if it is ever
+//          shown. Nothing written after midnight can steer the picks.
 //   write  { day, player, answers }: a player's two answers, sealed in the same D1 batch as the write and its counts.
 // Records hold player ids, never names. prev_hash is UNIQUE, so the chain can't fork, whichever game writes next.
 
@@ -39,18 +41,27 @@ export async function writeInsert(db, prev, { day, player, record, t }) {
 // The day's crowd entry (its record, parsed), sealing it first if it isn't on the chain yet. Two requests at once can't
 // both seal one (scatter_ledger_one_crowd, prev_hash UNIQUE): the loser reads the winner's.
 // `getRegistryHead` is an async function giving the registry's head at 00:00 UTC that day, called only when sealing.
-export const daySeed = (day, registry) => sha256("triviamoba|" + day + "|" + registry);
-export async function crowdDay(db, day, getRegistryHead, t) {
+// The day's seed: a keyed hash of the day and the registry head, made with the server's secret (Web Crypto, so it runs in
+// Workers and Node). Never sent to a page.
+export async function daySeed(secret, day, registry) {
+  if (!secret) throw new Error("daySeed needs the server secret.");
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = new Uint8Array(await crypto.subtle.sign("HMAC", key, enc.encode("triviamoba|" + day + "|" + registry)));
+  return [...sig].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+export async function crowdDay(db, day, getRegistryHead, t, secret) {
   for (let i = 0; i < 4; i++) {
     const got = await db.prepare("SELECT record FROM scatter_ledger WHERE kind = 'crowd' AND day = ?").bind(day).first();
     if (got) return JSON.parse(got.record);
     const registry = await getRegistryHead();
     const prev = await head(db);
-    const { write, crowd } = pickDay(await daySeed(day, registry));
+    const seed = await daySeed(secret, day, registry);
+    const { write, crowd } = pickDay(seed);
     const ids = [...new Set(crowd)];
     const { results } = await db.prepare(`SELECT prompt, k, text, n FROM scatter_counts WHERE prompt IN (${ids.map(() => "?").join(",")})`)
       .bind(...ids).all();
-    const rec = { day, registry, write, crowd: crowd.map((id) => snapshot(id, results.filter((r) => r.prompt === id))) };
+    const rec = { day, registry, seed_hash: await sha256(seed), write, crowd: crowd.map((id) => snapshot(id, results.filter((r) => r.prompt === id))) };
     const record = JSON.stringify(rec);
     try {
       await db.prepare("INSERT INTO scatter_ledger (kind, day, sheet_id, record, prev_hash, hash, created_at) VALUES ('crowd', ?, NULL, ?, ?, ?, ?)")
