@@ -4,6 +4,13 @@ Newest first. Times are Hawaii time (HST). The page shows its version in the low
 
 ---
 
+## v0.6.1
+**Fri Oct 23, 2026 · 4:33 AM HST**
+
+- INT's heal is +1 again (owner: "the game is way too fast already, we need to slow it down"). The pad shows "+1" and the heal glows one cell. Removed: the +2 heal, so INT needs 5 right answers to fill its own lane again, against 3 for STR and DEF.
+
+---
+
 ## v0.6 — "One Spoke"
 **Fri Oct 23, 2026 · 4:25 AM HST**
 
