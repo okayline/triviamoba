@@ -272,7 +272,7 @@ var $stage = document.getElementById("stage");
 // lanes start out at the rim and run in to it over 120 degrees, each 5 raised tiles (space 1 at the rim, space 5 by the goal). Positions are worked out on a flat board (x right, y away from you)
 // and then squashed by TILT, with every tile given DEPTH pixels of side.
 // Tiles light up to your marker as you move in.
-var HUB = { x: 200, y: 42 }, ANG = [150, 90, 30], D0 = 30, CELL = 30, LEN = 5 * CELL, TILT = 0.66, DEPTH = 10, HALF = 17, PAD_R = 26;   // HALF: half a tile's width; PAD_R: the start pad's radius
+var HUB = { x: 200, y: 42 }, ANG = [150, 90, 30], D0 = 30, CELL = 30, LEN = 5 * CELL, TILT = 0.66, DEPTH = 10, HALF = 24, PAD_R = 32;   // HALF: half a tile's width; PAD_R: the start pad's radius
 function flat(i, d, off) {
   var a = ANG[i] * Math.PI / 180;
   return { x: Math.cos(a) * d - Math.sin(a) * off, y: Math.sin(a) * d + Math.cos(a) * off };
@@ -325,7 +325,7 @@ function renderBoard() {
     tiles.push({ y: flat(i, D0 + LEN - 15, HALF + 11).y, html: wrap(tower(i, D0 + LEN - 15, false, "me")) });   // your tower, out at the edge
     for (var cj = 1; cj <= 5; cj++) {
       if (cj === k) continue;
-      [-7, 7].forEach(function (o) {
+      [-10, 10].forEach(function (o) {
         var fp = flat(i, D0 + (5 - cj + 0.5) * CELL, o), sp = proj(fp);
         tokens.push({ y: fp.y, html: wrap('<ellipse class="shadow" cx="' + sp.x + '" cy="' + sp.y + '" rx="4" ry="2"/><circle class="creep ' + (cj < k ? "me" : "far") + '" cx="' + sp.x + '" cy="' + (sp.y - 5) + '" r="3.5"/>') });
       });
@@ -347,7 +347,7 @@ function renderBoard() {
       '<span class="label">' + (S.st.k[i] ? "space " + S.st.k[i] + " of 5" : "start pad") + " · " + laneState(i) + sh + "</span></div>" +
       '<div class="lane-foot"><span>you: <b>' + me + "</b></span></div></div>";
   }).join("");
-  $board.innerHTML = '<div class="panel"><svg class="fanboard" viewBox="-13 8 426 204" role="img" aria-label="Three lanes of five tiles running in from the edge to the common goal at the top, seen from above">' + svg + "</svg>" + rows + "</div>";
+  $board.innerHTML = '<div class="panel"><svg class="fanboard" viewBox="-23 4 446 216" role="img" aria-label="Three lanes of five tiles running in from the edge to the common goal at the top, seen from above">' + svg + "</svg>" + rows + "</div>";
 }
 
 function renderDraft() {
