@@ -166,7 +166,7 @@ var TODAY = LANES.LANES;
 var LABEL = { def: "DEF · History", str: "STR · Body, Moon & Earth", int: "INT · Science & Tech" };
 var SHORT = { def: "DEF", str: "STR", int: "INT" };
 var ACTION = {
-  def: "A right answer puts a shield on any lane: it blocks the next wave there. Hold space 3 or better to win this lane.",
+  def: "A right answer pushes forward by your call and puts a shield on any lane: it blocks the next wave there. Reach space 5 to take the tower.",
   str: "A right answer pushes forward by your call. Reach space 5 to take the tower.",
   int: "A right answer heals +1 here, or your lowest lane once this one has its tower. Reach space 5 to take the tower."
 };
@@ -296,16 +296,16 @@ function pickQuestion(tag, lane, round) {
 var $board = document.getElementById("board");
 var $stage = document.getElementById("stage");
 
-// The board: a third of a wheel seen tilted from above. Three lanes fan out over 120 degrees from a hub (your base) to the
-// far towers on the rim, each lane 5 raised tiles. Positions are worked out on a flat board (x right, y away from you)
+// The board: a third of a wheel seen tilted from above, flipped: the common goal is the hub at the top, and the three
+// lanes start out at the rim and run in to it over 120 degrees, each 5 raised tiles (space 1 at the rim, space 5 by the goal). Positions are worked out on a flat board (x right, y away from you)
 // and then squashed by TILT, with every tile given DEPTH pixels of side.
-// Each lane's marker starts on space 3; the dashed ring is the ghost's place on its own track.
-var HUB = { x: 200, y: 205 }, ANG = [150, 90, 30], D0 = 30, CELL = 30, LEN = 5 * CELL, TILT = 0.55, DEPTH = 9;
+// Tiles light up to your marker as you move in; the dashed ring is the ghost's place on its own track.
+var HUB = { x: 200, y: 42 }, ANG = [150, 90, 30], D0 = 30, CELL = 30, LEN = 5 * CELL, TILT = 0.55, DEPTH = 9;
 function flat(i, d, off) {
   var a = ANG[i] * Math.PI / 180;
   return { x: Math.cos(a) * d - Math.sin(a) * off, y: Math.sin(a) * d + Math.cos(a) * off };
 }
-function proj(p) { return { x: +(HUB.x + p.x).toFixed(1), y: +(HUB.y - p.y * TILT).toFixed(1) }; }
+function proj(p) { return { x: +(HUB.x + p.x).toFixed(1), y: +(HUB.y + p.y * TILT).toFixed(1) }; }   // flipped: the hub at the top, the lanes spread out below it
 function pts(a) { return a.map(function (p) { return p.x + "," + p.y; }).join(" "); }
 function slab(corners, on) {
   var cls = "t" + (on ? " on" : ""), sides = "";
@@ -331,55 +331,55 @@ function tower(i, d, down, side) {
 }
 function isNow(i) { return (S.phase === "call" || S.phase === "question" || S.phase === "shield" || S.phase === "reveal") && S.lane === i; }
 function laneState(i) {
-  if (laneDone(i)) return laneWon(i) ? (TODAY[i] === "def" ? "held" : "tower taken") : "done";
-  if (TODAY[i] !== "def" && laneWon(i)) return "tower taken";
+  if (laneWon(i)) return "tower taken";
+  if (laneDone(i)) return "done";
   return isNow(i) ? "round " + (S.round + 1) + " of " + ROUNDS : "open";
 }
 function renderBoard() {
   var g = ghostState();
   var floor = [proj({ x: 0, y: 0 })];
   for (var a = 150; a >= 30; a -= 10) floor.push(proj({ x: Math.cos(a * Math.PI / 180) * 212, y: Math.sin(a * Math.PI / 180) * 212 }));
-  var tiles = [{ y: 0, html: '<g class="hubg">' + slab(ring(0, 0, 26, 18), false) + '<text class="hubt" x="' + HUB.x + '" y="' + (HUB.y - 1) + '" text-anchor="middle" dominant-baseline="central">YOU</text></g>' }];
+  var tiles = [{ y: 0, html: '<g class="hubg">' + slab(ring(0, 0, 26, 18), false) + '<text class="hubt" x="' + HUB.x + '" y="' + (HUB.y - 1) + '" text-anchor="middle" dominant-baseline="central">GOAL</text></g>' }];
   var tokens = [];
   TODAY.forEach(function (tag, i) {
     var k = S.st.k[i], wrap = function (h) { return '<g class="fan c-' + tag + (isNow(i) ? " now" : "") + '">' + h + "</g>"; };
     for (var j = 1; j <= 5; j++) {
       var d0 = D0 + (j - 1) * CELL + 2, d1 = D0 + j * CELL - 2;
       var c = [flat(i, d0, -11), flat(i, d1, -11), flat(i, d1, 11), flat(i, d0, 11)].map(proj);
-      tiles.push({ y: flat(i, (d0 + d1) / 2, 0).y, html: wrap(slab(c, j <= k)) });
+      tiles.push({ y: flat(i, (d0 + d1) / 2, 0).y, html: wrap(slab(c, 6 - j <= k)) });   // tile j from the hub is space 6 − j
     }
     var pad = flat(i, D0 + LEN + 24, 0);
-    var taken = laneWon(i) && (tag !== "def" || laneDone(i));
-    tiles.push({ y: flat(i, D0 + 15, 22).y, html: wrap(tower(i, D0 + 15, false, "me")) });
-    tiles.push({ y: flat(i, D0 + LEN - 15, 22).y, html: wrap(tower(i, D0 + LEN - 15, taken, "gh")) });
+    var taken = laneWon(i);
+    tiles.push({ y: flat(i, D0 + 15, 22).y, html: wrap(tower(i, D0 + 15, taken, "gh")) });          // the goal's tower, by the hub
+    tiles.push({ y: flat(i, D0 + LEN - 15, 22).y, html: wrap(tower(i, D0 + LEN - 15, false, "me")) });   // your tower, out at the edge
     for (var cj = 1; cj <= 5; cj++) {
       if (cj === k) continue;
       [-5, 5].forEach(function (o) {
-        var fp = flat(i, D0 + (cj - 0.5) * CELL, o), sp = proj(fp);
+        var fp = flat(i, D0 + (5 - cj + 0.5) * CELL, o), sp = proj(fp);
         tokens.push({ y: fp.y, html: wrap('<ellipse class="shadow" cx="' + sp.x + '" cy="' + sp.y + '" rx="4" ry="2"/><circle class="creep ' + (cj < k ? "me" : "gh") + '" cx="' + sp.x + '" cy="' + (sp.y - 5) + '" r="3.5"/>') });
       });
     }
-    tiles.push({ y: pad.y, html: wrap(slab(ring(pad.x, pad.y, 18, 14), false)) });
-    var m = proj(flat(i, D0 + CELL * (k - 0.5), 0)), gp = proj(pad);
-    var gm = proj(flat(i, D0 + CELL * (g.k[i] - 0.5), 0));
-    tokens.push({ y: flat(i, D0 + CELL * (k - 0.5), 0).y, html: wrap('<ellipse class="shadow" cx="' + m.x + '" cy="' + m.y + '" rx="9" ry="4.5"/><circle class="mk" cx="' + m.x + '" cy="' + (m.y - 9) + '" r="9"/>') });
-    if (S.rounds[i].length) tokens.push({ y: flat(i, D0 + CELL * (g.k[i] - 0.5), 0).y - 1, html: wrap('<circle class="gmk" cx="' + gm.x + '" cy="' + (gm.y - 9) + '" r="12"/>') });
+    tiles.push({ y: pad.y, html: wrap(slab(ring(pad.x, pad.y, 18, 14), true)) });   // your start pad, lit
+    var at = function (n) { return n === 0 ? pad : flat(i, D0 + CELL * (5 - n + 0.5), 0); };   // the middle of space n (0: the start pad)
+    var m = proj(at(k)), gp = proj(pad), gm = proj(at(g.k[i]));
+    tokens.push({ y: at(k).y, html: wrap('<ellipse class="shadow" cx="' + m.x + '" cy="' + m.y + '" rx="9" ry="4.5"/><circle class="mk" cx="' + m.x + '" cy="' + (m.y - 9) + '" r="9"/>') });
+    if (S.rounds[i].length) tokens.push({ y: at(g.k[i]).y + 1, html: wrap('<circle class="gmk" cx="' + gm.x + '" cy="' + (gm.y - 9) + '" r="12"/>') });
     tokens.push({ y: pad.y, html: wrap('<text x="' + gp.x + '" y="' + (gp.y - 9) + '" text-anchor="middle" dominant-baseline="central" font-size="22">' + (S.rounds[i].length ? hero(GHOST.hero).e : "?") + "</text>") });
   });
-  var byFar = function (a, b) { return b.y - a.y; };
+  var byFar = function (a, b) { return a.y - b.y; };   // the hub is furthest away now: draw from the top down
   var svg = '<polygon class="floor" points="' + pts(floor) + '"/>' +
     tiles.sort(byFar).map(function (t) { return t.html; }).join("") + tokens.sort(byFar).map(function (t) { return t.html; }).join("");
   var rows = TODAY.map(function (tag, i) {
     var hid = S.lineup[i];
     var me = hid ? hero(hid).e + " " + hero(hid).name : "—";
-    var gh = S.rounds[i].length ? hero(GHOST.hero).e + " space " + g.k[i] : "?";
+    var gh = S.rounds[i].length ? hero(GHOST.hero).e + " " + (g.k[i] ? "space " + g.k[i] : "start pad") : "?";
     var sh = S.st.shields[i] ? " · 🛡 " + S.st.shields[i] : "";
     return '<div class="lane c-' + tag + (isNow(i) ? " now" : "") + '">' +
       '<div class="lane-top"><span class="lane-name">' + LABEL[tag] + '</span>' +
-      '<span class="label">space ' + S.st.k[i] + " of 5 · " + laneState(i) + sh + "</span></div>" +
+      '<span class="label">' + (S.st.k[i] ? "space " + S.st.k[i] + " of 5" : "start pad") + " · " + laneState(i) + sh + "</span></div>" +
       '<div class="lane-foot"><span>you: <b>' + me + '</b></span><span>ghost: <b>' + gh + "</b></span></div></div>";
   }).join("");
-  $board.innerHTML = '<div class="panel"><svg class="fanboard" viewBox="-10 50 420 185" role="img" aria-label="Three lanes of five tiles fanning out from your base, with the ghost\'s run on its own track, seen from above">' + svg + "</svg>" + rows + "</div>";
+  $board.innerHTML = '<div class="panel"><svg class="fanboard" viewBox="-10 8 420 190" role="img" aria-label="Three lanes of five tiles running in from the edge to the common goal at the top, with the ghost\'s run on its own track, seen from above">' + svg + "</svg>" + rows + "</div>";
 }
 
 function renderDraft() {
@@ -451,17 +451,17 @@ function renderShield() {
 function renderReveal() {
   var i = S.lane, ri = S.round, tag = TODAY[i], r = S.rounds[i][ri], ev = r.ev, me = hero(S.lineup[i]);
   var call = S.calls[i][ri], done = laneDone(i), moved = ev.to[i] - ev.from[i];
-  var verdict = ev.shield !== undefined ? "Shield on " + SHORT[TODAY[ev.shield]]
+  var verdict = ev.shield !== undefined ? (moved > 0 ? "Pushed, shield on " : "Shield on ") + SHORT[TODAY[ev.shield]]
     : ev.healed !== undefined ? "Healed " + SHORT[TODAY[ev.healed]] + " +1"
     : ev.blocked ? "Wave blocked"
     : moved > 0 ? "You push the lane" : moved < 0 ? "Pushed back" : "Held";
-  if (done) verdict = laneWon(i) ? (tag === "def" ? "Lane held" : "Tower taken") : "Lane done";
+  if (done) verdict = laneWon(i) ? "Tower taken" : "Lane done";
   var how = ev.right ? "" : " The wave " + (ev.blocked ? "was blocked by your shield." : "pushed you back 1.");
   var last = i === 2;
   $stage.innerHTML =
     '<div class="label">Round ' + (ri + 1) + " of " + ROUNDS + '</div>' +
     '<div class="verdict c-' + tag + '">' + verdict + "</div>" +
-    '<div class="note">' + answeredLine(r) + (call === "TILT" && ev.right && tag === "str" ? " TILT landed " + (r.heads ? "heads (+3)." : "tails (−1).") : "") + how + " Marker on space " + S.st.k[i] + " of 5.</div>" +
+    '<div class="note">' + answeredLine(r) + (call === "TILT" && ev.right && tag !== "int" ? " TILT landed " + (r.heads ? "heads (+3)." : "tails (−1).") : "") + how + " Marker on space " + S.st.k[i] + " of 5.</div>" +
     '<div class="cols">' +
       '<div class="side"><span class="who">You</span><span class="crit ' + (moved > 0 || ev.shield !== undefined || ev.healed !== undefined ? "win" : moved < 0 ? "lose" : "") + '">' + me.e + '</span><span class="hn">' + me.name + '</span><span class="line"><span class="tag k-' + call + '">' + call + "</span> · " + SHORT[tag] + '</span><span class="pushv ' + cls(moved) + '">' + fmt(moved) + "</span></div>" +
     "</div>" +
@@ -480,7 +480,7 @@ function renderResult() {
     '<div class="label">Result</div>' + (head ? '<div class="big">' + head + "</div>" : "") +
     '<div class="note">' + won + " of 3 lanes won, over " + S.rounds.reduce(function (a, rs) { return a + rs.length; }, 0) + " questions.</div>" +
     "<div>" + [0, 1, 2].map(function (i) {
-      return '<div class="row c-' + TODAY[i] + '"><span><span class="lane-name">' + SHORT[TODAY[i]] + "</span> · " + hero(S.lineup[i]).e + " " + hero(S.lineup[i]).name + '</span><span class="mono ' + (laneWon(i) ? "pos" : "") + '">' + "space " + S.st.k[i] + " · " + laneState(i) + " · ghost: space " + g.k[i] + "</span></div>";
+      return '<div class="row c-' + TODAY[i] + '"><span><span class="lane-name">' + SHORT[TODAY[i]] + "</span> · " + hero(S.lineup[i]).e + " " + hero(S.lineup[i]).name + '</span><span class="mono ' + (laneWon(i) ? "pos" : "") + '">' + (S.st.k[i] ? "space " + S.st.k[i] : "start pad") + " · " + laneState(i) + " · ghost: " + (g.k[i] ? "space " + g.k[i] : "start pad") + "</span></div>";
     }).join("") + "</div>" +
     '<div class="note">Declared: ' + hon[0] + " knew, " + hon[1] + " guessed, " + hon[2] + " looked up.</div>" +
     '<button class="btn" data-act="again">Play again</button>';
