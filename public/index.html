@@ -272,7 +272,7 @@ var $stage = document.getElementById("stage");
 // lanes start out at the rim and run in to it over 120 degrees, each 5 raised tiles (space 1 at the rim, space 5 by the goal). Positions are worked out on a flat board (x right, y away from you)
 // and then squashed by TILT, with every tile given DEPTH pixels of side.
 // Tiles light up to your marker as you move in.
-var HUB = { x: 200, y: 42 }, ANG = [150, 90, 30], D0 = 30, CELL = 30, LEN = 5 * CELL, TILT = 0.66, DEPTH = 10;
+var HUB = { x: 200, y: 42 }, ANG = [150, 90, 30], D0 = 30, CELL = 30, LEN = 5 * CELL, TILT = 0.66, DEPTH = 10, HALF = 17, PAD_R = 26;   // HALF: half a tile's width; PAD_R: the start pad's radius
 function flat(i, d, off) {
   var a = ANG[i] * Math.PI / 180;
   return { x: Math.cos(a) * d - Math.sin(a) * off, y: Math.sin(a) * d + Math.cos(a) * off };
@@ -294,7 +294,7 @@ function ring(cx, cy, r, n) {
 }
 // A tower beside a lane: a tall block with an orb on top, or a low stump once it has fallen. The far tower falls when you take the lane.
 function tower(i, d, down, side) {
-  var h = down ? 5 : 22, g = [flat(i, d - 7, 15), flat(i, d + 7, 15), flat(i, d + 7, 29), flat(i, d - 7, 29)].map(proj);
+  var h = down ? 5 : 22, g = [flat(i, d - 7, HALF + 4), flat(i, d + 7, HALF + 4), flat(i, d + 7, HALF + 18), flat(i, d - 7, HALF + 18)].map(proj);
   var t = g.map(function (p) { return { x: p.x, y: +(p.y - h).toFixed(1) }; });
   var edges = [0, 1, 2, 3].sort(function (a, b) { return (g[a].y + g[(a + 1) % 4].y) - (g[b].y + g[(b + 1) % 4].y); });
   var sides = edges.map(function (j) { var n = (j + 1) % 4; return '<polygon class="tw" points="' + pts([g[j], g[n], t[n], t[j]]) + '"/>'; }).join("");
@@ -316,21 +316,21 @@ function renderBoard() {
     var k = S.st.k[i], wrap = function (h) { return '<g class="fan c-' + tag + (isNow(i) ? " now" : "") + '">' + h + "</g>"; };
     for (var j = 1; j <= 5; j++) {
       var d0 = D0 + (j - 1) * CELL + 2, d1 = D0 + j * CELL - 2;
-      var c = [flat(i, d0, -11), flat(i, d1, -11), flat(i, d1, 11), flat(i, d0, 11)].map(proj);
+      var c = [flat(i, d0, -HALF), flat(i, d1, -HALF), flat(i, d1, HALF), flat(i, d0, HALF)].map(proj);
       tiles.push({ y: flat(i, (d0 + d1) / 2, 0).y, html: wrap(slab(c, 6 - j <= k)) });   // tile j from the hub is space 6 − j
     }
-    var pad = flat(i, D0 + LEN + 24, 0);
+    var pad = flat(i, D0 + LEN + PAD_R + 6, 0);
     var taken = laneWon(i);
-    tiles.push({ y: flat(i, D0 + 15, 22).y, html: wrap(tower(i, D0 + 15, taken, "far")) });          // the goal's tower, by the hub
-    tiles.push({ y: flat(i, D0 + LEN - 15, 22).y, html: wrap(tower(i, D0 + LEN - 15, false, "me")) });   // your tower, out at the edge
+    tiles.push({ y: flat(i, D0 + 15, HALF + 11).y, html: wrap(tower(i, D0 + 15, taken, "far")) });          // the goal's tower, by the hub
+    tiles.push({ y: flat(i, D0 + LEN - 15, HALF + 11).y, html: wrap(tower(i, D0 + LEN - 15, false, "me")) });   // your tower, out at the edge
     for (var cj = 1; cj <= 5; cj++) {
       if (cj === k) continue;
-      [-5, 5].forEach(function (o) {
+      [-7, 7].forEach(function (o) {
         var fp = flat(i, D0 + (5 - cj + 0.5) * CELL, o), sp = proj(fp);
         tokens.push({ y: fp.y, html: wrap('<ellipse class="shadow" cx="' + sp.x + '" cy="' + sp.y + '" rx="4" ry="2"/><circle class="creep ' + (cj < k ? "me" : "far") + '" cx="' + sp.x + '" cy="' + (sp.y - 5) + '" r="3.5"/>') });
       });
     }
-    tiles.push({ y: pad.y, html: wrap(slab(ring(pad.x, pad.y, 18, 14), true)) });   // your start pad, lit
+    tiles.push({ y: pad.y, html: wrap(slab(ring(pad.x, pad.y, PAD_R, 16), true)) });   // your start pad, lit
     var at = function (n) { return n === 0 ? pad : flat(i, D0 + CELL * (5 - n + 0.5), 0); };   // the middle of space n (0: the start pad)
     var m = proj(at(k));
     tokens.push({ y: at(k).y, html: wrap('<ellipse class="shadow" cx="' + m.x + '" cy="' + m.y + '" rx="9" ry="4.5"/><circle class="mk" cx="' + m.x + '" cy="' + (m.y - 9) + '" r="9"/>') });
@@ -347,7 +347,7 @@ function renderBoard() {
       '<span class="label">' + (S.st.k[i] ? "space " + S.st.k[i] + " of 5" : "start pad") + " · " + laneState(i) + sh + "</span></div>" +
       '<div class="lane-foot"><span>you: <b>' + me + "</b></span></div></div>";
   }).join("");
-  $board.innerHTML = '<div class="panel"><svg class="fanboard" viewBox="0 12 400 200" role="img" aria-label="Three lanes of five tiles running in from the edge to the common goal at the top, seen from above">' + svg + "</svg>" + rows + "</div>";
+  $board.innerHTML = '<div class="panel"><svg class="fanboard" viewBox="-13 8 426 204" role="img" aria-label="Three lanes of five tiles running in from the edge to the common goal at the top, seen from above">' + svg + "</svg>" + rows + "</div>";
 }
 
 function renderDraft() {
