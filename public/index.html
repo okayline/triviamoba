@@ -140,7 +140,7 @@ h1 { font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-hei
   </header>
   <section id="board" aria-label="Lanes"></section>
   <main id="stage" class="panel" aria-live="polite"></main>
-  <div class="ver">v0.5</div>
+  <div class="ver">v0.5.1</div>
 </div>
 
 <script src="engine/lanes.js"></script>
@@ -300,7 +300,7 @@ function renderBoard() {
     }
     var pad = flat(i, D0 + LEN + PAD_R + 6, 0);
     var taken = laneWon(i);
-    tiles.push({ y: flat(i, D0 + 15, HALF + 11).y, html: wrap(tower(i, D0 + 15, taken, "far"), true) });          // the goal's tower, by the hub
+    tiles.push({ y: flat(i, D0 + 75, HALF + 11).y, html: wrap(tower(i, D0 + 75, taken, "far"), true) });          // the goal's tower, beside the middle tile (space 3)
     tiles.push({ y: flat(i, D0 + LEN - 15, HALF + 11).y, html: wrap(tower(i, D0 + LEN - 15, false, "me"), true) });   // your tower, out at the edge
     for (var cj = 1; cj <= 5; cj++) {
       if (cj === k) continue;

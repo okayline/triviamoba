@@ -4,6 +4,13 @@ Newest first. Times are Hawaii time (HST). The page shows its version in the low
 
 ---
 
+## v0.5.1
+**Fri Oct 23, 2026 · 4:13 AM HST**
+
+- The goal's tower of each lane stands beside the middle tile (space 3) instead of the tile next to the goal. Removed: its place beside the tile next to the goal. Your tower at the edge is unchanged.
+
+---
+
 ## v0.5
 **Fri Oct 23, 2026 · 4:10 AM HST**
 
