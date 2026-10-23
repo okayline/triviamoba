@@ -229,10 +229,9 @@ var GHOST = [
     { call: "FEED",   right: true,  heads: true } ] }
 ];
 var ROUNDS = 3;                                  // questions per lane
-var GHOST_HISTORY = "Sample history: CLUTCH in 5 of its last 9 lanes. Best in Science. On mystery questions it picks like a crowd.";
 
-// Mystery questions have no right answer: you score by matching the ghost's pick. The ghost picks like a crowd: each option's
-// chance is its count, out of the people surveyed. Prompts and counts are from ProtoQA (CC BY 4.0, https://github.com/iesl/protoqa-data),
+// Crowd rounds have no right answer: you score by matching the ghost's pick (shown to the player as "the crowd's"). The
+// ghost picks like a crowd: each option's chance is its count, out of the people surveyed. Prompts and counts are from ProtoQA (CC BY 4.0, https://github.com/iesl/protoqa-data),
 // top four answers only, chosen for no bad vibes. Real SCATTER answers replace them later.
 var MYSTERY = [
   { q: "Name something a 17th-century pirate might think the moon was.", a: [["Cheese", 33], ["A star", 23], ["A light", 17], ["A god", 15]] },
@@ -404,7 +403,7 @@ function renderDraft() {
   $stage.innerHTML =
     '<div class="seed"><span class="label">Day seed</span><span class="mono">' + SEED + '</span><span class="label">3 lanes sealed</span></div>' +
     "<h2>Draft your lanes</h2>" +
-    '<div class="note">Pick 3 of 6 heroes, one per lane. Your tag weights are visible. The ghost\'s are not, and its lineup is already sealed. ' + GHOST_HISTORY + "</div>" +
+    '<div class="note">Pick 3 of 6 heroes, one per lane. Your tag weights are visible.</div>' +
     '<div class="slots">' + slots + "</div>" +
     '<div class="heroes">' + cards + "</div>" +
     '<button class="btn" data-act="lock"' + (picked < 3 ? " disabled" : "") + ">Lock lineup</button>";
@@ -426,7 +425,7 @@ function renderQuestion() {
   $stage.innerHTML =
     '<div class="seed c-' + tag + '"><span class="lane-name">' + LABEL[tag] + " · round " + (S.round + 1) + '</span><span class="label">called <span class="tag k-' + S.calls[S.lane][S.round] + '">' + S.calls[S.lane][S.round] + "</span></span></div>" +
     '<div class="timer c-' + tag + '"><div id="tbar"></div></div>' +
-    '<div class="q">' + q.q + "</div>" + (q.mystery ? '<div class="note">Mystery: there is no right answer. You score if you match the ghost\'s sealed pick.</div>' : "") +
+    '<div class="q">' + q.q + "</div>" + (q.mystery ? '<div class="note">Crowd round: there is no right answer. You score if you match the crowd.</div>' : "") +
     '<div class="opts">' + q.opts.map(function (o, i) { return '<button class="opt" data-act="answer" data-i="' + i + '">' + o + "</button>"; }).join("") + "</div>";
   var end = Date.now() + TIME * 1000, bar = document.getElementById("tbar");
   clearInterval(timerId);
@@ -438,12 +437,12 @@ function renderQuestion() {
 }
 
 function renderReveal() {
-  var i = S.lane, ri = S.round, tag = TODAY[i], r = S.rounds[i][ri], g = GHOST[i].rounds[ri], gh = hero(GHOST[i].hero), me = hero(S.lineup[i]);
+  var i = S.lane, ri = S.round, tag = TODAY[i], r = S.rounds[i][ri], me = hero(S.lineup[i]);
   var call = S.calls[i][ri], done = laneDone(i), w = laneWinner(i);
-  var verdict = r.step > 0 ? "You push the lane" : r.step < 0 ? "Ghost pushes back" : "Held";
-  if (done) verdict = w === "you" ? "You take the lane" : w === "ghost" ? "Ghost takes the lane" : "Lane tied";
+  var verdict = r.step > 0 ? "You push the lane" : r.step < 0 ? "Pushed back" : "Held";
+  if (done) verdict = w === "you" ? "You take the lane" : w === "ghost" ? "Lane lost" : "Lane tied";
   var answered = S.q.mystery
-    ? (r.pick === null ? "Time's up. " : "") + "No right answer. The ghost picked " + S.q.right + (r.right ? ": you matched it." : ": you didn't match it.")
+    ? (r.pick === null ? "Time's up. " : "") + "No right answer. The crowd picked " + S.q.right + (r.right ? ": you matched it." : ": you didn't match it.")
     : r.pick === null ? "Time's up. It was " + S.q.right + "." : (r.right ? "Correct: " + S.q.right : "Wrong. It was " + S.q.right + ".");
   var last = i === 2;
   $stage.innerHTML =
@@ -452,7 +451,6 @@ function renderReveal() {
     '<div class="note">' + answered + (call === "TILT" && r.right ? " TILT landed " + (r.heads ? "heads (+5)." : "tails (−2).") : "") + " Marker on space " + S.k[i] + " of 5.</div>" +
     '<div class="cols">' +
       '<div class="side"><span class="who">You</span><span class="crit ' + (r.step > 0 ? "win" : r.step < 0 ? "lose" : "") + '">' + me.e + '</span><span class="hn">' + me.name + '</span><span class="line"><span class="tag k-' + call + '">' + call + "</span> · " + LABEL[tag] + " " + me.w[tag] + "/3 · ×" + (1 + match(me, tag)).toFixed(1) + '</span><span class="pushv ' + cls(r.mine) + '">' + fmt(r.mine) + "</span></div>" +
-      '<div class="side"><span class="who">Ghost</span><span class="crit ' + (r.step < 0 ? "win" : r.step > 0 ? "lose" : "") + '">' + gh.e + '</span><span class="hn">' + gh.name + '</span><span class="line"><span class="tag k-' + g.call + '">' + g.call + "</span> · " + LABEL[tag] + " " + gh.w[tag] + "/3 · ×" + (1 + match(gh, tag)).toFixed(1) + " · " + (g.right ? "right" : "wrong") + '</span><span class="pushv ' + cls(r.theirs) + '">' + fmt(r.theirs) + "</span></div>" +
     "</div>" +
     (S.q.mystery ? '<div class="note">Nothing to look up on this one.</div>' : '<div><div class="label" style="margin-bottom:8px">How did you get it? (no points either way)</div><div class="chips">' +
       ["I knew it", "I guessed", "I looked it up"].map(function (t, k) {
@@ -468,13 +466,13 @@ function renderResult() {
   var total = 0, hon = [0, 0, 0];
   S.rounds.forEach(function (rs) { rs.forEach(function (r) { total += r.net; }); });
   S.honesty.forEach(function (hs) { hs.forEach(function (k) { if (k !== undefined) hon[k]++; }); });
-  var head = won > lost ? "You win" : won < lost ? "Ghost wins" : "Draw";
+  var head = won > lost ? "You win" : won < lost ? "Not this time" : "Draw";
   $stage.innerHTML =
     '<div class="label">Result</div><div class="big">' + head + "</div>" +
     '<div class="note">' + won + " lane" + (won === 1 ? "" : "s") + " won, " + lost + " lost, over " + S.rounds.reduce(function (a, rs) { return a + rs.length; }, 0) + " questions. Net push " + fmt(Math.round(total * 10) / 10) + ".</div>" +
     "<div>" + [0, 1, 2].map(function (i) {
       var w = wins[i];
-      return '<div class="row c-' + TODAY[i] + '"><span><span class="lane-name">' + LABEL[TODAY[i]] + "</span> · " + hero(S.lineup[i]).e + " " + hero(S.lineup[i]).name + " vs " + hero(GHOST[i].hero).e + " " + hero(GHOST[i].hero).name + '</span><span class="mono ' + (w === "you" ? "pos" : w === "ghost" ? "neg" : "") + '">' + (w === "you" ? "won" : w === "ghost" ? "lost" : "tied") + " · space " + S.k[i] + "</span></div>";
+      return '<div class="row c-' + TODAY[i] + '"><span><span class="lane-name">' + LABEL[TODAY[i]] + "</span> · " + hero(S.lineup[i]).e + " " + hero(S.lineup[i]).name + '</span><span class="mono ' + (w === "you" ? "pos" : w === "ghost" ? "neg" : "") + '">' + (w === "you" ? "won" : w === "ghost" ? "lost" : "tied") + " · space " + S.k[i] + "</span></div>";
     }).join("") + "</div>" +
     '<div class="note">Declared: ' + hon[0] + " knew, " + hon[1] + " guessed, " + hon[2] + " looked up.</div>" +
     '<button class="btn" data-act="again">Play again</button>';

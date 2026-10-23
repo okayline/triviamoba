@@ -8,6 +8,7 @@ Newest first. Times are Hawaii time (HST). The page shows its version in the low
 **Fri Oct 23, 2026 · 3:22 AM HST**
 
 - The version number shows under the game panel, on the right, small and grey. Removed: the note that the page has no version number.
+- The ghost is off the bottom panels; it stays on the board above, and the rules are unchanged. Draft: "Pick 3 of 6 heroes, one per lane. Your tag weights are visible." Crowd rounds: "You score if you match the crowd" and "The crowd picked X". Reveal: only your side. Result: "Not this time" when you lose more lanes, and lane rows without "vs" the ghost's hero. Removed: the ghost's column on the reveal, "Ghost pushes back", "Ghost takes the lane", "Ghost wins", the ghost's sample history in the draft (`GHOST_HISTORY`), and "the ghost's sealed pick".
 
 ---
 
