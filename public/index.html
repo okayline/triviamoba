@@ -45,6 +45,7 @@ h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; }
 h1 { font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-height: 1; }
 .sub { color: var(--mute); font-size: 13px; margin-top: 6px; }
 .mono { font-family: var(--f-mono); }
+.ver { justify-self: end; margin-top: -6px; font: 400 11px var(--f-mono); color: var(--mute); }   /* the version, under the game panel on the right (a test checks it matches CHANGELOG.md) */
 .label { font: 500 11px/1 var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--mute); }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 12px; min-width: 0; }
 .seed { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
@@ -158,6 +159,7 @@ h1 { font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-hei
   </header>
   <section id="board" aria-label="Lanes"></section>
   <main id="stage" class="panel" aria-live="polite"></main>
+  <div class="ver">v0.3.1</div>
 </div>
 
 <script>

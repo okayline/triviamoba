@@ -1,11 +1,18 @@
 # TriviaMoba Changelog
 
-Newest first. Times are Hawaii time (HST). The prototype has no version number on the page; these are numbered here from the commits.
+Newest first. Times are Hawaii time (HST). The page shows its version in the lower right since v0.3.1; earlier versions were numbered here from the commits.
+
+---
+
+## v0.3.1
+**Fri Oct 23, 2026 · 3:22 AM HST**
+
+- The version number shows under the game panel, on the right, small and grey. Removed: the note that the page has no version number.
 
 ---
 
 ## v0.3 — "The Crowd"
-**Fri Oct 23, 2026 · 3:30 AM HST** (not deployed; migration `001_crowd.sql` not run yet)
+**Fri Oct 23, 2026 · 3:18 AM HST** (migration `001_crowd.sql` run on the live moba-beat database before the push)
 
 - A backend, first step of TriviaMoba and SCATTER.EXE becoming one game. The Worker uses the moba-beat database and shares SCATTER.EXE's players, rate limits and ledger chain; its own data goes in new `scatter_writes` and `scatter_counts` tables and new ledger kinds `crowd` and `write`, so SCATTER.EXE keeps running untouched.
 - Every UTC day has 2 write prompts and 6 crowd prompts, picked from the shared registry's head at 00:00 UTC (as moba-beat does; `src/registry.js` is copied from it), and sealed in the day's `crowd` entry with the crowd prompts' counts frozen: everyone plays the same words and counts all day, and nothing written after midnight can change the pick. If the registry can't be read, the day isn't sealed and the next request tries again.
