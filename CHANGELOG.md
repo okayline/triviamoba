@@ -7,7 +7,7 @@ Newest first. Times are Hawaii time (HST). The page shows its version in the low
 ## v0.5
 **Fri Oct 23, 2026 · 4:10 AM HST**
 
-- No more call before each question: you go straight to the question. A right answer in DEF or STR pushes forward 2, a wrong answer lets the wave push you back 1 (a shield blocks it) and costs nothing more, and INT's right answer still heals +1. The lane's action text shows once at the start of each lane. Removed: the "Commit a call" menu and its CSS, CLUTCH, FEED and TILT (the +2 / +1 / coin-flip pushes and the −2 / 0 / −1 penalties), the TILT coin flip, the "called …" tag on the question and the reveal, and their colours.
+- No more call before each question: you go straight to the question. A right answer in DEF or STR pushes forward 2, a wrong answer lets the wave push you back 1 (a shield blocks it) and costs nothing more, and INT's right answer still heals +1. Removed: the explainer text under the lane line (each lane's action description, `ACTION`), the "Commit a call" menu and its CSS, CLUTCH, FEED and TILT (the +2 / +1 / coin-flip pushes and the −2 / 0 / −1 penalties), the TILT coin flip, the "called …" tag on the question and the reveal, and their colours.
 - The towers are fully solid. They were drawn inside their lane's group, which is dimmed to 60% whenever the lane isn't the one in play, so they looked see-through. Removed: the dimming on the towers (the tiles and markers keep it).
 
 ---

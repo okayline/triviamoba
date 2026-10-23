@@ -150,11 +150,6 @@ h1 { font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-hei
 var TODAY = LANES.LANES;
 var LABEL = { def: "DEF · History", str: "STR · Body, Moon & Earth", int: "INT · Science & Tech" };
 var SHORT = { def: "DEF", str: "STR", int: "INT" };
-var ACTION = {
-  def: "A right answer pushes forward 2 and puts a shield on any lane: it blocks the next wave there. Reach space 5 to take the tower.",
-  str: "A right answer pushes forward 2. Reach space 5 to take the tower.",
-  int: "A right answer heals +1 here, or your lowest lane once this one has its tower. Reach space 5 to take the tower."
-};
 var SEED = "3f9a·c07e·51b2";
 var TIME = 15;                                   // seconds per question
 var ROUNDS = LANES.ROUNDS;
@@ -360,7 +355,6 @@ function renderQuestion() {
   var tag = TODAY[S.lane], q = S.q;
   $stage.innerHTML =
     '<div class="seed c-' + tag + '"><span class="lane-name">' + LABEL[tag] + " · round " + (S.round + 1) + " of " + ROUNDS + "</span></div>" +
-    (S.round === 0 ? '<div class="note">' + ACTION[tag] + "</div>" : "") +
     '<div class="timer c-' + tag + '"><div id="tbar"></div></div>' +
     '<div class="q">' + q.q + "</div>" + (q.mystery ? '<div class="note">Crowd round: there is no right answer. You score if you match the crowd.</div>' : "") +
     '<div class="opts">' + q.opts.map(function (o, i) { return '<button class="opt" data-act="answer" data-i="' + i + '">' + o + "</button>"; }).join("") + "</div>";
