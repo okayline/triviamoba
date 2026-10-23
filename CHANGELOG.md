@@ -4,6 +4,13 @@ Newest first. Times are Hawaii time (HST). The page shows its version in the low
 
 ---
 
+## v0.5.3
+**Fri Oct 23, 2026 · 4:17 AM HST**
+
+- The Moon question reads "About how long does light take to travel from the Moon to Earth?" with the same answers (about 1 second). Removed: "moonlight take to reach Earth", which could also be read as the sunlight's whole trip from the Sun (about 8 minutes).
+
+---
+
 ## v0.5.2
 **Fri Oct 23, 2026 · 4:15 AM HST**
 
