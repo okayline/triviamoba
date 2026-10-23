@@ -34,7 +34,20 @@ const sha = (t) => createHash("sha256").update(t).digest("hex");
 const T0 = Date.parse("2027-01-01T08:00:00Z") / 1000;
 const G = "0".repeat(64);
 
+// the registry's public ledger, faked: entries newest first, one an hour before each midnight ("reg-<day>")
+const REG = (day) => "reg-" + day;
+function fakeRegistry() {
+  globalThis.fetch = async (url) => {
+    const u = new URL(url), before = Number(u.searchParams.get("before") || Infinity);
+    const days = ["2027-01-03", "2027-01-02", "2027-01-01"];
+    const entries = days.map((d, i) => ({ id: 3 - i, hash: REG(d), at: Date.parse(d + "T00:00:00Z") / 1000 - 3600 })).filter((e) => e.id < before);
+    return new Response(JSON.stringify({ entries }));
+  };
+}
+const seed = (day) => sha("triviamoba|" + day + "|" + REG(day));
+
 function setup() {
+  fakeRegistry();
   let t = T0;
   setClock(() => t);
   const env = { DB: fakeD1() };
@@ -72,11 +85,11 @@ test("a snapshot merges players' answers into the starting counts by key, bigges
   assert.equal(s.total, 32 + 24 + 21 + 7 + 33); assert.equal(s.players, 33);
 });
 
-test("the first request seals the day's crowd entry from the genesis hash; everyone gets the same day; options come without counts", async () => {
+test("the first request seals the day's crowd entry, picked from the registry's head before midnight; everyone gets the same day; options come without counts", async () => {
   const { call, rows } = setup();
   const a = await call("ann", "GET", "/api/today"), b = await call("bo", "GET", "/api/today");
-  const p = pickDay(G);
-  const rec = JSON.stringify({ day: "2027-01-01", write: p.write, crowd: p.crowd.map((id) => snapshot(id)) });
+  const p = pickDay(seed("2027-01-01"));
+  const rec = JSON.stringify({ day: "2027-01-01", registry: REG("2027-01-01"), write: p.write, crowd: p.crowd.map((id) => snapshot(id)) });
   assert.deepEqual(rows("SELECT kind, record, prev_hash, hash FROM scatter_ledger"), [{ kind: "crowd", record: rec, prev_hash: G, hash: sha(G + "|" + rec) }]);
   assert.equal(a.status, 200); assert.deepEqual(a, b);
   assert.deepEqual(a.write.map((w) => w.id), p.write);
@@ -120,4 +133,15 @@ test("the migration adds exactly TriviaMoba's part of schema.sql on top of SCATT
   migrated.exec(scatter);
   migrated.exec(readFileSync(new URL("../migrations/001_crowd.sql", import.meta.url), "utf8"));
   assert.deepEqual(cols(migrated).map((r) => r[0]), cols(full).map((r) => r[0]));
+});
+
+test("the day's pick doesn't move when this game's own ledger moves, and a registry that can't be read seals nothing", async () => {
+  const { env, call, rows } = setup();
+  env.DB.raw.prepare("INSERT INTO scatter_ledger (kind, day, record, prev_hash, hash, created_at) VALUES ('sheet', '2026-12-31', '{}', ?, 'h1', 0)").run(G);
+  const a = await call("ann", "GET", "/api/today");
+  assert.deepEqual(a.write.map((w) => w.id), pickDay(seed("2027-01-01")).write, "the ledger's head played no part");
+  const { env: env2, call: call2 } = setup();
+  globalThis.fetch = async () => new Response("no", { status: 502 });
+  assert.equal((await call2("bo", "GET", "/api/today")).status, 503);
+  assert.equal(env2.DB.raw.prepare("SELECT COUNT(*) AS n FROM scatter_ledger").get().n, 0);
 });

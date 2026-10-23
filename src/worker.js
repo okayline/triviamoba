@@ -1,7 +1,8 @@
 // TriviaMoba Worker. The page and its files are static assets; /api/* comes here first. The data lives in the moba-beat
 // database, in SCATTER.EXE's tables plus TriviaMoba's own (schema.sql).
 //
-//   GET  /api/today                      { day, nextIn, write, crowd, mine? }: today's UTC date (the server's clock),
+//   GET  /api/today                      { day, nextIn, registry, write, crowd, mine? }: today's UTC date (the server's clock),
+//                                        the shared registry head the day was picked from,
 //                                        the two write prompts ({ id, q }), the crowd rounds ({ id, q, options: [a] },
 //                                        no counts), and your sealed answers, entry and hash if you wrote today.
 //   POST /api/write {day, answers: [2]}  seal your two answers on the ledger, once a day. Blank is allowed; an answer
@@ -12,6 +13,7 @@
 
 import { sha256, head, writeInsert, crowdDay, isUnique } from "./ledger.js";
 import * as C from "../public/engine/crowd.js";
+import { registryHeadAt } from "./registry.js";
 
 const COOKIE = "tm";
 const COOKIE_MAX_AGE = 400 * 86400;
@@ -105,11 +107,16 @@ async function body(req) {
 
 // ---------- the day ----------
 
+// The day's crowd entry. A registry that can't be read leaves the day unsealed; the next request tries again.
+const today_ = (env, day) => crowdDay(env.DB, day, () => registryHeadAt(day).catch((e) => {
+  console.error(e); throw new Oops("Today's questions aren't ready yet. Try again in a moment.", 503);
+}), now());
+
 // What the page sees: crowd rounds without their counts (the counts are on the ledger entry, for anyone who looks).
 async function view(env, player, day) {
-  const d = await crowdDay(env.DB, day, now());
+  const d = await today_(env, day);
   const out = {
-    day, nextIn: dayEnd(day) - now(),
+    day, nextIn: dayEnd(day) - now(), registry: d.registry,
     write: d.write.map((id) => ({ id, q: C.prompt(id).q })),
     crowd: d.crowd.map((c) => ({ id: c.id, q: c.q, options: c.options.map((o) => o.a) })),
   };
@@ -130,7 +137,7 @@ async function write(req, env) {
   const day = utcDay();
   if (b.day !== day) throw new Oops("That day is over. Here's today's.", 409);
   const { player, cookie } = await needPlayer(req, env);
-  const d = await crowdDay(env.DB, day, now());
+  const d = await today_(env, day);
   if (!Array.isArray(b.answers) || b.answers.length !== d.write.length) throw new Oops(`Write ${d.write.length} answers (blank is fine).`);
   const answers = d.write.map((id, i) => ({ prompt: id, a: C.clean(b.answers[i]) }));
   const bad = answers.find((x) => !C.allowed(x.a));
