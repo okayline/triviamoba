@@ -5,3 +5,5 @@ Trivia in three MOBA lanes. Draft 3 of 6 creatures into the lanes, commit a CLUT
 This is the first prototype: one static page, `public/index.html`. The heroes, the 20 questions and the ghost's moves are hand-written sample data, and nothing is saved. Not built yet: the shared daily seed, a ledger, accounts, real ghosts from other players' lineups.
 
 Design: the Claude Doc "Lane Game: Design Notes".
+
+Mystery prompts and their answer counts are from ProtoQA (Boratko et al., 2020), CC BY 4.0: https://github.com/iesl/protoqa-data

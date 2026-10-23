@@ -227,16 +227,22 @@ var GHOST = [
     { call: "FEED",   right: true,  heads: true } ] }
 ];
 var ROUNDS = 3;                                  // questions per lane
-var GHOST_HISTORY = "Sample history: CLUTCH in 5 of its last 9 lanes. Best in Science. On mystery questions it always picks the weirdest answer.";
+var GHOST_HISTORY = "Sample history: CLUTCH in 5 of its last 9 lanes. Best in Science. On mystery questions it picks like a crowd.";
 
-// mystery questions have no right answer: you score by matching the ghost's pick (always the last, weirdest option listed)
+// Mystery questions have no right answer: you score by matching the ghost's pick. The ghost picks like a crowd: each option's
+// chance is its count, out of the people surveyed. Prompts and counts are from ProtoQA (CC BY 4.0, https://github.com/iesl/protoqa-data),
+// top four answers only, chosen for no bad vibes. Real SCATTER answers replace them later.
 var MYSTERY = [
-  { q: "What does the color blue taste like?", a: ["Cool mint", "Blueberries, obviously", "Static electricity", "A cold bathtub"] },
-  { q: "How loud is a rainbow?", a: ["Whisper quiet", "A soft hum", "About as loud as a cat", "Bees inside a trumpet"] },
-  { q: "What does a Tuesday smell like?", a: ["Fresh laundry", "Old coffee", "Wet cardboard", "A microwaved ghost"] },
-  { q: "How much does a secret weigh?", a: ["Nothing at all", "About a feather", "A bag of rocks", "One sleepy walrus"] },
-  { q: "What does a nap sound like?", a: ["A soft zzz", "A fridge humming", "A ceiling fan", "Pudding falling downstairs"] },
-  { q: "What color is the number 7?", a: ["Green", "Purple", "Orange", "Plaid"] }
+  { q: "Name something a 17th-century pirate might think the moon was.", a: [["Cheese", 33], ["A star", 23], ["A light", 17], ["A god", 15]] },
+  { q: "Name something spies wear to disguise who they are.", a: [["Sunglasses", 38], ["A mask", 27], ["A wig", 27], ["Facial hair", 4]] },
+  { q: "Name something a soldier should always have with him.", a: [["A weapon", 62], ["Dog tags", 26], ["A helmet", 2], ["A compass", 2]] },
+  { q: "Name a hat you don't see many people wear in real life.", a: [["Top hat", 45], ["Cowboy hat", 28], ["Fedora", 6], ["Straw hat", 5]] },
+  { q: "Name something in your home a ghost might turn on and off.", a: [["The lights", 77], ["The TV", 12], ["The radio", 4], ["A fan", 2]] },
+  { q: "Name somewhere a little kid thinks a monster is hiding.", a: [["The closet", 59], ["Under the bed", 34], ["The basement", 3], ["The attic", 2]] },
+  { q: "Name something a witch could ride if her broom broke.", a: [["A mop", 27], ["A vacuum", 27], ["A stick", 7], ["A bicycle", 7]] },
+  { q: "Name something a pirate takes off before bed.", a: [["Eye patch", 32], ["Hook", 24], ["Hat", 21], ["Wooden leg", 7]] },
+  { q: "Name something that's harder to do in outer space.", a: [["Breathe", 37], ["Walk", 34], ["Go to the bathroom", 16], ["Eat", 13]] },
+  { q: "Name a chore you'd want a robot to do.", a: [["Dishes", 35], ["Laundry", 31], ["Clean the bathroom", 10], ["Vacuum", 10]] }
 ];
 
 var CALLS = {
@@ -278,7 +284,9 @@ function pickMystery() {
   if (!pool.length) pool = MYSTERY;
   var item = pool[Math.floor(Math.random() * pool.length)];
   S.usedM[MYSTERY.indexOf(item)] = true;
-  return { q: item.q, right: item.a[3], opts: shuffle(item.a), mystery: true };   // "right" = the ghost's pick: its weirdest option
+  var total = item.a.reduce(function (n, o) { return n + o[1]; }, 0), r = Math.random() * total, pick = item.a[0][0];
+  for (var i = 0; i < item.a.length; i++) { r -= item.a[i][1]; if (r < 0) { pick = item.a[i][0]; break; } }
+  return { q: item.q, right: pick, opts: shuffle(item.a.map(function (o) { return o[0]; })), mystery: true };   // "right" = the ghost's pick, by the counts
 }
 function pickQuestion(tag, lane, round) {
   if (S.imp[lane] === round) return pickMystery();
