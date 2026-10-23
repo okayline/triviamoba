@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
-/* Layout: three horizontal lanes stacked like a MOBA minimap (you on the left, the ghost on the right), with the current step's panel under them. Dark by choice: a single committed look. */
+/* Layout: the board (three lanes fanning out from your base, the ghost on its own track) with the current step's panel under it. Dark by choice: a single committed look. */
 :root {
   --ink: #0c1215;
   --panel: #131c21;
@@ -16,10 +16,9 @@
   --line: #27363f;
   --fg: #e8efe9;
   --mute: #8fa3a8;
-  --sci: #4fd1c5;
-  --arts: #e8d36a;
-  --places: #5aa7ff;
-  --pop: #f06aa8;
+  --def: #5aa7ff;
+  --str: #ff9d6c;
+  --int: #4fd1c5;
   --clutch: #ff7a45;
   --feed: #5fd38d;
   --tilt: #c58cff;
@@ -64,7 +63,7 @@ h1 { font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-hei
 .fill { position: absolute; top: 0; bottom: 0; left: 0; opacity: .22; transition: width .5s cubic-bezier(.3,.8,.3,1); }
 .lane-foot { display: flex; justify-content: space-between; font: 400 12px var(--f-mono); color: var(--mute); gap: 8px; }
 .lane-foot b { color: var(--fg); font-weight: 500; }
-.c-science { --lc: var(--sci); } .c-arts { --lc: var(--arts); } .c-places { --lc: var(--places); } .c-pop { --lc: var(--pop); }
+.c-def { --lc: var(--def); } .c-str { --lc: var(--str); } .c-int { --lc: var(--int); }
 .lane .lane-name { color: var(--lc); }
 .marker, .fill { background: var(--lc); }
 .base.me { color: var(--lc); }
@@ -85,11 +84,6 @@ h1 { font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-hei
 @keyframes shake { 25% { transform: translateX(-6px) rotate(-6deg); } 75% { transform: translateX(6px) rotate(6deg); } }
 .hero-name { font: 700 16px var(--f-display); }
 .hero-slot { font: 500 11px var(--f-mono); color: var(--mute); }
-.bars { display: grid; gap: 4px; }
-.bar { display: grid; grid-template-columns: 38px 1fr 12px; gap: 6px; align-items: center; font: 400 11px var(--f-mono); color: var(--mute); }
-.bar i { display: block; height: 6px; border-radius: 3px; background: var(--line); position: relative; overflow: hidden; }
-.bar i::after { content: ""; position: absolute; inset: 0 auto 0 0; width: calc(var(--w) / 3 * 100%); background: var(--lc); }
-.bar.off { opacity: .4; }
 
 .slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .slot { background: var(--panel-2); border: 1px dashed var(--line); border-radius: 8px; padding: 10px 8px; text-align: center; color: var(--mute); font: 500 12px var(--f-mono); cursor: pointer; min-width: 0; }
@@ -147,6 +141,8 @@ h1 { font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-hei
 .orb.me, .creep.me { fill: var(--feed); }
 .orb.gh, .creep.gh { fill: var(--bad); }
 .creep { stroke: var(--ink); stroke-width: 1; }
+.fan .gmk { fill: none; stroke: var(--mute); stroke-width: 2; stroke-dasharray: 3 2; }   /* the ghost's place on its own track */
+.shields { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .hubt { fill: var(--fg); font: 700 11px var(--f-display); letter-spacing: .06em; }
 @media (prefers-reduced-motion: reduce) { .marker, .fill, .timer > div { transition: none; } .badge, .crit { animation: none !important; } }
 </style>
@@ -155,83 +151,77 @@ h1 { font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-hei
 <div class="wrap">
   <header>
     <h1>TriviaMoba</h1>
-    <div class="sub">Prototype with sample data: 6 heroes, 20 gamer and silly questions, 3 rounds a lane, one scripted ghost. Nothing is saved.</div>
+    <div class="sub">Prototype with sample data: 3 lanes (DEF, STR, INT), 5 rounds a lane against the map's creep waves, one scripted ghost run to compare with. Nothing is saved.</div>
   </header>
   <section id="board" aria-label="Lanes"></section>
   <main id="stage" class="panel" aria-live="polite"></main>
-  <div class="ver">v0.3.1</div>
+  <div class="ver">v0.4</div>
 </div>
 
+<script src="engine/lanes.js"></script>
 <script>
 // ---- data (all sample content for the prototype) ----
-var TAGS = ["science", "arts", "places", "pop"];
-var LABEL = { science: "Science", arts: "Arts", places: "Places", pop: "Pop culture" };
-var SHORT = { science: "SCI", arts: "ART", places: "PLC", pop: "POP" };
-var TODAY = ["science", "places", "pop"];       // the hardcoded "daily seed" picks these 3 of the 4 categories
+// The lane rules are public/engine/lanes.js (LANES): lanes DEF, STR, INT, played in that order, against the map.
+var TODAY = LANES.LANES;
+var LABEL = { def: "DEF · History", str: "STR · Body, Moon & Earth", int: "INT · Science & Tech" };
+var SHORT = { def: "DEF", str: "STR", int: "INT" };
+var ACTION = {
+  def: "A right answer puts a shield on any lane: it blocks the next wave there. Hold space 3 or better to win this lane.",
+  str: "A right answer pushes forward by your call. Reach space 5 to take the tower.",
+  int: "A right answer heals +1 here, or your lowest lane once this one has its tower. Reach space 5 to take the tower."
+};
 var SEED = "3f9a·c07e·51b2";
 var TIME = 15;                                   // seconds per question
+var ROUNDS = LANES.ROUNDS;
 
 var HEROES = [
-  { id: "marie", name: "Marie", e: "🦉", c: "#4fd1c5", w: { science: 3, arts: 0, places: 1, pop: 1 } },
-  { id: "atlas", name: "Atlas", e: "🐢", c: "#5aa7ff", w: { science: 1, arts: 1, places: 3, pop: 0 } },
-  { id: "pixel", name: "Pixel", e: "🐙", c: "#f06aa8", w: { science: 1, arts: 1, places: 0, pop: 3 } },
-  { id: "vince", name: "Vince", e: "🦜", c: "#e8d36a", w: { science: 0, arts: 3, places: 1, pop: 2 } },
-  { id: "hale",  name: "Hale",  e: "🦊", c: "#ff9d6c", w: { science: 2, arts: 0, places: 2, pop: 1 } },
-  { id: "echo",  name: "Echo",  e: "🦇", c: "#c58cff", w: { science: 1, arts: 2, places: 1, pop: 2 } }
+  { id: "marie", name: "Marie", e: "🦉", c: "#4fd1c5" },
+  { id: "atlas", name: "Atlas", e: "🐢", c: "#5aa7ff" },
+  { id: "pixel", name: "Pixel", e: "🐙", c: "#f06aa8" },
+  { id: "vince", name: "Vince", e: "🦜", c: "#e8d36a" },
+  { id: "hale",  name: "Hale",  e: "🦊", c: "#ff9d6c" },
+  { id: "echo",  name: "Echo",  e: "🦇", c: "#c58cff" }
 ];
 function hero(id) { return HEROES.filter(function (h) { return h.id === id; })[0]; }
 
 // correct answer first; options are shuffled when shown
 var QS = {
-  science: [
-    { q: "Which animal has three hearts?", a: ["Octopus", "Shark", "Elephant", "Giraffe"] },
-    { q: "Bananas are slightly radioactive. Which element is to blame?", a: ["Potassium", "Uranium", "Calcium", "Iron"] },
-    { q: "What do you call a group of crows?", a: ["A murder", "A gaggle", "A pod", "A herd"] },
-    { q: "Lightning is hotter than the surface of the…?", a: ["Sun", "Lava", "A pizza oven", "A volcano"] },
-    { q: "Sound can't travel through what, which is why nobody hears you scream in space?", a: ["A vacuum", "Water", "Glass", "Lava"] }
+  def: [
+    { q: "Which of the Seven Wonders of the Ancient World is still standing?", a: ["The Great Pyramid of Giza", "The Lighthouse of Alexandria", "The Colossus of Rhodes", "The Hanging Gardens of Babylon"] },
+    { q: "The first email was sent in which decade?", a: ["The 1970s", "The 1950s", "The 1960s", "The 1980s"] },
+    { q: "Which of these was invented first?", a: ["The fax machine", "The telephone", "The light bulb", "The radio"] },
+    { q: "Teaching at Oxford University had already begun before which of these was founded?", a: ["The Aztec city of Tenochtitlan", "The Colosseum in Rome", "The city of London", "The Great Wall of China"] },
+    { q: "In 1974, what was the first product scanned with a barcode at a supermarket checkout?", a: ["A pack of chewing gum", "A can of soup", "A loaf of bread", "A box of cereal"] }
   ],
-  arts: [
-    { q: "Which instrument does Link play in Zelda: Ocarina of Time?", a: ["The ocarina", "A kazoo", "A banjo", "A recorder"] },
-    { q: "The Mona Lisa has no visible eyebrows. Who painted her?", a: ["Leonardo da Vinci", "Michelangelo", "Raphael", "Botticelli"] },
-    { q: "Who composed the Ode to Joy while almost completely deaf?", a: ["Beethoven", "Mozart", "Bach", "Chopin"] },
-    { q: "Who is never gonna give you up, never gonna let you down?", a: ["Rick Astley", "Barry White", "Michael Bolton", "Phil Collins"] },
-    { q: "Which painter famously cut off part of his own ear?", a: ["Van Gogh", "Monet", "Picasso", "Rembrandt"] }
+  str: [
+    { q: "Which bone in the human body isn't joined to any other bone?", a: ["The hyoid, in the throat", "The kneecap", "The tailbone", "The stirrup, in the ear"] },
+    { q: "The Moon is slowly drifting away from Earth. About how far each year?", a: ["About 4 cm", "About 4 mm", "About 40 cm", "About 4 m"] },
+    { q: "Which layer of Earth's atmosphere is the hottest?", a: ["The thermosphere", "The troposphere", "The stratosphere", "The mesosphere"] },
+    { q: "About how long does moonlight take to reach Earth?", a: ["About 1 second", "About 8 minutes", "About 1 minute", "It arrives instantly"] },
+    { q: "Why do we always see the same side of the Moon?", a: ["Its spin is locked to its orbit", "It doesn't spin at all", "Earth's magnetism holds it still", "Sunlight only lights one side"] }
   ],
-  places: [
-    { q: "Nintendo, the home of Mario and Zelda, was founded in which country?", a: ["Japan", "The USA", "South Korea", "Sweden"] },
-    { q: "It's not Sydney and it's not Melbourne. What's Australia's capital?", a: ["Canberra", "Sydney", "Melbourne", "Perth"] },
-    { q: "Which continent has no countries at all?", a: ["Antarctica", "Europe", "South America", "Oceania"] },
-    { q: "Which country is shaped like a boot?", a: ["Italy", "Greece", "Spain", "Chile"] },
-    { q: "What is the smallest country in the world?", a: ["Vatican City", "Monaco", "San Marino", "Liechtenstein"] }
-  ],
-  pop: [
-    { q: "In Among Us, what is the secret saboteur called?", a: ["The Impostor", "The Traitor", "The Spy", "The Ghost"] },
-    { q: "Which Pokémon is number 25 in the Pokédex?", a: ["Pikachu", "Eevee", "Jigglypuff", "Meowth"] },
-    { q: "In Minecraft, which mob sneaks up on you and explodes?", a: ["The Creeper", "The Zombie", "The Skeleton", "The Enderman"] },
-    { q: "In Mario Kart, who does the blue shell go after?", a: ["Whoever is in first", "Whoever is last", "The nearest racer", "A random racer"] },
-    { q: "In Sonic the Hedgehog, what do you collect and then lose when you get hit?", a: ["Rings", "Coins", "Gems", "Stars"] }
+  int: [
+    { q: "What does the S in HTTPS stand for?", a: ["Secure", "Server", "Standard", "Static"] },
+    { q: "Which element has the chemical symbol W?", a: ["Tungsten", "Tin", "Zinc", "Vanadium"] },
+    { q: "What number is 1111 in binary?", a: ["15", "11", "16", "4"] },
+    { q: "At what temperature are Celsius and Fahrenheit the same?", a: ["−40°", "0°", "−32°", "100°"] },
+    { q: "Which of these particles has no electric charge?", a: ["The neutron", "The proton", "The electron", "The positron"] }
   ]
 };
 
-// the scripted ghost: another player's sealed lineup, replayed (hand-written for the prototype)
-var GHOST = [
-  { hero: "hale", rounds: [
-    { call: "CLUTCH", right: true,  heads: true },
-    { call: "FEED",   right: true,  heads: true },
-    { call: "CLUTCH", right: false, heads: true } ] },
-  { hero: "echo", rounds: [
-    { call: "FEED",   right: true,  heads: true },
-    { call: "TILT",   right: true,  heads: false },
-    { call: "FEED",   right: true,  heads: true } ] },
-  { hero: "pixel", rounds: [
-    { call: "CLUTCH", right: false, heads: true },
-    { call: "TILT",   right: true,  heads: true },
-    { call: "FEED",   right: true,  heads: true } ] }
-];
-var ROUNDS = 3;                                  // questions per lane
+// the scripted ghost: another player's earlier run of the same lanes, replayed on its own track (hand-written for the
+// prototype). It never moves your marker. `shield` is where a right DEF answer put its shield.
+var GHOST = { hero: "hale", lanes: [
+  [ { call: "FEED", right: true, shield: 1 }, { call: "FEED", right: true, shield: 2 }, { call: "CLUTCH", right: false },
+    { call: "FEED", right: true, shield: 1 }, { call: "FEED", right: false } ],
+  [ { call: "CLUTCH", right: false }, { call: "FEED", right: true }, { call: "TILT", right: true, heads: true },
+    { call: "FEED", right: false }, { call: "CLUTCH", right: true } ],
+  [ { call: "FEED", right: true }, { call: "TILT", right: false }, { call: "FEED", right: true },
+    { call: "CLUTCH", right: true }, { call: "FEED", right: false } ]
+] };
 
-// Crowd rounds have no right answer: you score by matching the ghost's pick (shown to the player as "the crowd's"). The
-// ghost picks like a crowd: each option's chance is its count, out of the people surveyed. Prompts and counts are from ProtoQA (CC BY 4.0, https://github.com/iesl/protoqa-data),
+// Crowd rounds have no right answer: you score by matching the crowd's pick (drawn by the counts: each option's chance
+// is its count out of the people surveyed). Prompts and counts are from ProtoQA (CC BY 4.0, https://github.com/iesl/protoqa-data),
 // top four answers only, chosen for no bad vibes. Real SCATTER answers replace them later.
 var MYSTERY = [
   { q: "Name something a 17th-century pirate might think the moon was.", a: [["Cheese", 33], ["A star", 23], ["A light", 17], ["A god", 15]] },
@@ -247,25 +237,18 @@ var MYSTERY = [
 ];
 
 var CALLS = {
-  CLUTCH: "Right +3, wrong −3. Push hard.",
+  CLUTCH: "Right +2, wrong −2. Push hard.",
   FEED: "Right +1, wrong 0. Play safe.",
-  TILT: "Right: coin flip, +5 or −2. Wrong −2."
+  TILT: "Right: coin flip, +3 or −1. Wrong −1."
 };
 
-// ---- rules ----
-function match(h, tag) { return h.w[tag] / 3; }                       // 0 to 1
-function pushOf(call, right, heads, m) {
-  var base;
-  if (right) base = call === "CLUTCH" ? 3 : call === "FEED" ? 1 : (heads ? 5 : -2);
-  else base = call === "CLUTCH" ? -3 : call === "FEED" ? 0 : -2;
-  return Math.round(base * (1 + m) * 10) / 10;
-}
+// ---- helpers ----
 function shuffle(a) {
   a = a.slice();
   for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; }
   return a;
 }
-function fmt(n) { return (n > 0 ? "+" : n < 0 ? "−" : "") + Math.abs(n).toFixed(Math.abs(n % 1) < 0.05 || Math.abs(n % 1) > 0.95 ? 0 : 1); }
+function fmt(n) { return (n > 0 ? "+" : n < 0 ? "−" : "") + Math.abs(n); }
 function cls(n) { return n > 0 ? "pos" : n < 0 ? "neg" : ""; }
 
 // ---- state ----
@@ -273,12 +256,23 @@ var S;
 var timerId = null;
 function fresh() {
   clearInterval(timerId);
-  S = { phase: "draft", lane: 0, round: 0, lineup: [null, null, null], k: [3, 3, 3], rounds: [[], [], []],
-        calls: [[], [], []], honesty: [[], [], []], q: null, used: {}, usedM: {},
-        imp: [0, 1, 2].map(function () { return Math.random() < 0.5 ? Math.floor(Math.random() * ROUNDS) : -1; }) };   // 0 or 1 mystery round a lane
+  S = { phase: "draft", lane: 0, round: 0, lineup: [null, null, null], st: LANES.fresh(), rounds: [[], [], []],
+        calls: [[], [], []], honesty: [[], [], []], q: null, used: {}, usedM: {}, pending: null };
 }
-function laneDone(i) { return S.rounds[i].length >= ROUNDS || S.k[i] === 1 || S.k[i] === 5; }
-function laneWinner(i) { return S.k[i] > 3 ? "you" : S.k[i] < 3 ? "ghost" : "tie"; }
+function laneDone(i) { return S.rounds[i].length >= ROUNDS; }
+function laneWon(i) { return LANES.won(S.st, i); }
+
+// The ghost's track: its scripted run, replayed for as many rounds of each lane as you've played.
+function ghostState() {
+  var g = LANES.fresh();
+  for (var i = 0; i < 3; i++) {
+    for (var r = 0; r < S.rounds[i].length; r++) {
+      var x = GHOST.lanes[i][r];
+      LANES.play(g, i, x.call, x.right, !!x.heads, x.shield === undefined ? i : x.shield);
+    }
+  }
+  return g;
+}
 
 function pickMystery() {
   var pool = MYSTERY.filter(function (_, i) { return !S.usedM[i]; });
@@ -287,10 +281,10 @@ function pickMystery() {
   S.usedM[MYSTERY.indexOf(item)] = true;
   var total = item.a.reduce(function (n, o) { return n + o[1]; }, 0), r = Math.random() * total, pick = item.a[0][0];
   for (var i = 0; i < item.a.length; i++) { r -= item.a[i][1]; if (r < 0) { pick = item.a[i][0]; break; } }
-  return { q: item.q, right: pick, opts: shuffle(item.a.map(function (o) { return o[0]; })), mystery: true };   // "right" = the ghost's pick, by the counts
+  return { q: item.q, right: pick, opts: shuffle(item.a.map(function (o) { return o[0]; })), mystery: true };   // "right" = the crowd's pick, by the counts
 }
 function pickQuestion(tag, lane, round) {
-  if (S.imp[lane] === round) return pickMystery();
+  if (LANES.CROWD_ROUNDS.indexOf(round) >= 0) return pickMystery();
   var pool = QS[tag].filter(function (_, i) { return !S.used[tag + i]; });
   if (!pool.length) pool = QS[tag];
   var item = pool[Math.floor(Math.random() * pool.length)];
@@ -302,15 +296,10 @@ function pickQuestion(tag, lane, round) {
 var $board = document.getElementById("board");
 var $stage = document.getElementById("stage");
 
-function bar(h, tag, dimArts) {
-  return '<div class="bar c-' + tag + (dimArts && TODAY.indexOf(tag) < 0 ? " off" : "") + '"><span>' + SHORT[tag] + '</span><i style="--w:' + h.w[tag] + '"></i><span>' + h.w[tag] + '</span></div>';
-}
-function bars(h) { return '<div class="bars">' + TAGS.map(function (t) { return bar(h, t, true); }).join("") + "</div>"; }
-
 // The board: a third of a wheel seen tilted from above. Three lanes fan out over 120 degrees from a hub (your base) to the
-// ghost's bases on the rim, each lane 5 raised tiles. Positions are worked out on a flat board (x right, y away from you)
+// far towers on the rim, each lane 5 raised tiles. Positions are worked out on a flat board (x right, y away from you)
 // and then squashed by TILT, with every tile given DEPTH pixels of side.
-// Each lane's marker starts on space 3 and moves one space per round toward whoever pushed more.
+// Each lane's marker starts on space 3; the dashed ring is the ghost's place on its own track.
 var HUB = { x: 200, y: 205 }, ANG = [150, 90, 30], D0 = 30, CELL = 30, LEN = 5 * CELL, TILT = 0.55, DEPTH = 9;
 function flat(i, d, off) {
   var a = ANG[i] * Math.PI / 180;
@@ -331,7 +320,7 @@ function ring(cx, cy, r, n) {
   for (var j = 0; j < n; j++) { var t = j / n * 2 * Math.PI; out.push(proj({ x: cx + Math.cos(t) * r, y: cy + Math.sin(t) * r })); }
   return out;
 }
-// A tower beside a lane: a tall block with an orb on top, or a low stump once it has fallen. Flavor only, it changes no rules.
+// A tower beside a lane: a tall block with an orb on top, or a low stump once it has fallen. The far tower falls when you take the lane.
 function tower(i, d, down, side) {
   var h = down ? 5 : 22, g = [flat(i, d - 7, 15), flat(i, d + 7, 15), flat(i, d + 7, 29), flat(i, d - 7, 29)].map(proj);
   var t = g.map(function (p) { return { x: p.x, y: +(p.y - h).toFixed(1) }; });
@@ -340,23 +329,29 @@ function tower(i, d, down, side) {
   var cx = (t[0].x + t[2].x) / 2, cy = (t[0].y + t[2].y) / 2;
   return '<g class="tws">' + sides + '</g><polygon class="tw top" points="' + pts(t) + '"/>' + (down ? "" : '<circle class="orb ' + side + '" cx="' + cx.toFixed(1) + '" cy="' + (cy - 3).toFixed(1) + '" r="3.5"/>');
 }
-function isNow(i) { return (S.phase === "call" || S.phase === "question" || S.phase === "reveal") && S.lane === i; }
+function isNow(i) { return (S.phase === "call" || S.phase === "question" || S.phase === "shield" || S.phase === "reveal") && S.lane === i; }
+function laneState(i) {
+  if (laneDone(i)) return laneWon(i) ? (TODAY[i] === "def" ? "held" : "tower taken") : "done";
+  if (TODAY[i] !== "def" && laneWon(i)) return "tower taken";
+  return isNow(i) ? "round " + (S.round + 1) + " of " + ROUNDS : "open";
+}
 function renderBoard() {
+  var g = ghostState();
   var floor = [proj({ x: 0, y: 0 })];
   for (var a = 150; a >= 30; a -= 10) floor.push(proj({ x: Math.cos(a * Math.PI / 180) * 212, y: Math.sin(a * Math.PI / 180) * 212 }));
   var tiles = [{ y: 0, html: '<g class="hubg">' + slab(ring(0, 0, 26, 18), false) + '<text class="hubt" x="' + HUB.x + '" y="' + (HUB.y - 1) + '" text-anchor="middle" dominant-baseline="central">YOU</text></g>' }];
   var tokens = [];
   TODAY.forEach(function (tag, i) {
-    var k = S.k[i], wrap = function (h) { return '<g class="fan c-' + tag + (isNow(i) ? " now" : "") + '">' + h + "</g>"; };
+    var k = S.st.k[i], wrap = function (h) { return '<g class="fan c-' + tag + (isNow(i) ? " now" : "") + '">' + h + "</g>"; };
     for (var j = 1; j <= 5; j++) {
       var d0 = D0 + (j - 1) * CELL + 2, d1 = D0 + j * CELL - 2;
       var c = [flat(i, d0, -11), flat(i, d1, -11), flat(i, d1, 11), flat(i, d0, 11)].map(proj);
       tiles.push({ y: flat(i, (d0 + d1) / 2, 0).y, html: wrap(slab(c, j <= k)) });
     }
     var pad = flat(i, D0 + LEN + 24, 0);
-    var over = laneDone(i) && S.rounds[i].length, win = laneWinner(i);
-    tiles.push({ y: flat(i, D0 + 15, 22).y, html: wrap(tower(i, D0 + 15, over && win === "ghost", "me")) });
-    tiles.push({ y: flat(i, D0 + LEN - 15, 22).y, html: wrap(tower(i, D0 + LEN - 15, over && win === "you", "gh")) });
+    var taken = laneWon(i) && (tag !== "def" || laneDone(i));
+    tiles.push({ y: flat(i, D0 + 15, 22).y, html: wrap(tower(i, D0 + 15, false, "me")) });
+    tiles.push({ y: flat(i, D0 + LEN - 15, 22).y, html: wrap(tower(i, D0 + LEN - 15, taken, "gh")) });
     for (var cj = 1; cj <= 5; cj++) {
       if (cj === k) continue;
       [-5, 5].forEach(function (o) {
@@ -365,9 +360,11 @@ function renderBoard() {
       });
     }
     tiles.push({ y: pad.y, html: wrap(slab(ring(pad.x, pad.y, 18, 14), false)) });
-    var m = proj(flat(i, D0 + CELL * (k - 0.5), 0)), g = proj(pad);
+    var m = proj(flat(i, D0 + CELL * (k - 0.5), 0)), gp = proj(pad);
+    var gm = proj(flat(i, D0 + CELL * (g.k[i] - 0.5), 0));
     tokens.push({ y: flat(i, D0 + CELL * (k - 0.5), 0).y, html: wrap('<ellipse class="shadow" cx="' + m.x + '" cy="' + m.y + '" rx="9" ry="4.5"/><circle class="mk" cx="' + m.x + '" cy="' + (m.y - 9) + '" r="9"/>') });
-    tokens.push({ y: pad.y, html: wrap('<text x="' + g.x + '" y="' + (g.y - 9) + '" text-anchor="middle" dominant-baseline="central" font-size="22">' + (S.rounds[i].length ? hero(GHOST[i].hero).e : "?") + "</text>") });
+    if (S.rounds[i].length) tokens.push({ y: flat(i, D0 + CELL * (g.k[i] - 0.5), 0).y - 1, html: wrap('<circle class="gmk" cx="' + gm.x + '" cy="' + (gm.y - 9) + '" r="12"/>') });
+    tokens.push({ y: pad.y, html: wrap('<text x="' + gp.x + '" y="' + (gp.y - 9) + '" text-anchor="middle" dominant-baseline="central" font-size="22">' + (S.rounds[i].length ? hero(GHOST.hero).e : "?") + "</text>") });
   });
   var byFar = function (a, b) { return b.y - a.y; };
   var svg = '<polygon class="floor" points="' + pts(floor) + '"/>' +
@@ -375,16 +372,14 @@ function renderBoard() {
   var rows = TODAY.map(function (tag, i) {
     var hid = S.lineup[i];
     var me = hid ? hero(hid).e + " " + hero(hid).name : "—";
-    var gh = S.rounds[i].length ? hero(GHOST[i].hero).e + " " + hero(GHOST[i].hero).name : "?";
-    var w = laneWinner(i);
-    var state = laneDone(i) && S.rounds[i].length ? (w === "you" ? "you win" : w === "ghost" ? "ghost wins" : "tied")
-      : isNow(i) ? "round " + (S.round + 1) + " of " + ROUNDS : "open";
+    var gh = S.rounds[i].length ? hero(GHOST.hero).e + " space " + g.k[i] : "?";
+    var sh = S.st.shields[i] ? " · 🛡 " + S.st.shields[i] : "";
     return '<div class="lane c-' + tag + (isNow(i) ? " now" : "") + '">' +
-      '<div class="lane-top"><span class="lane-name">Lane ' + (i + 1) + " · " + LABEL[tag] + '</span>' +
-      '<span class="label">space ' + S.k[i] + " of 5 · " + state + "</span></div>" +
+      '<div class="lane-top"><span class="lane-name">' + LABEL[tag] + '</span>' +
+      '<span class="label">space ' + S.st.k[i] + " of 5 · " + laneState(i) + sh + "</span></div>" +
       '<div class="lane-foot"><span>you: <b>' + me + '</b></span><span>ghost: <b>' + gh + "</b></span></div></div>";
   }).join("");
-  $board.innerHTML = '<div class="panel"><svg class="fanboard" viewBox="-10 50 420 185" role="img" aria-label="Three lanes of five tiles fanning out from your base to the ghost\'s bases, seen from above">' + svg + "</svg>" + rows + "</div>";
+  $board.innerHTML = '<div class="panel"><svg class="fanboard" viewBox="-10 50 420 185" role="img" aria-label="Three lanes of five tiles fanning out from your base, with the ghost\'s run on its own track, seen from above">' + svg + "</svg>" + rows + "</div>";
 }
 
 function renderDraft() {
@@ -392,29 +387,29 @@ function renderDraft() {
   var slots = TODAY.map(function (tag, i) {
     var id = S.lineup[i];
     return '<button class="slot c-' + tag + (id ? " full" : "") + '" data-act="slot" data-i="' + i + '">' +
-      (id ? "<b>" + hero(id).e + " " + hero(id).name + "</b>" : "<b>Empty</b>") + "Lane " + (i + 1) + " · " + SHORT[tag] + "</button>";
+      (id ? "<b>" + hero(id).e + " " + hero(id).name + "</b>" : "<b>Empty</b>") + SHORT[tag] + "</button>";
   }).join("");
   var cards = HEROES.map(function (h) {
     var at = S.lineup.indexOf(h.id);
     return '<button class="hero" data-act="hero" data-id="' + h.id + '" aria-pressed="' + (at >= 0) + '">' +
       '<div class="hero-head"><span class="badge" style="background:' + h.c + '">' + h.e + '</span><div><div class="hero-name">' + h.name + '</div>' +
-      '<div class="hero-slot">' + (at >= 0 ? "Lane " + (at + 1) : "bench") + "</div></div></div>" + bars(h) + "</button>";
+      '<div class="hero-slot">' + (at >= 0 ? SHORT[TODAY[at]] : "bench") + "</div></div></div></button>";
   }).join("");
   $stage.innerHTML =
     '<div class="seed"><span class="label">Day seed</span><span class="mono">' + SEED + '</span><span class="label">3 lanes sealed</span></div>' +
     "<h2>Draft your lanes</h2>" +
-    '<div class="note">Pick 3 of 6 heroes, one per lane. Your tag weights are visible.</div>' +
+    '<div class="note">Pick 3 of 6 heroes, one per lane. You play DEF first, then STR, then INT, 5 rounds each. Every wrong answer lets the map\'s creep wave push you back a space.</div>' +
     '<div class="slots">' + slots + "</div>" +
     '<div class="heroes">' + cards + "</div>" +
     '<button class="btn" data-act="lock"' + (picked < 3 ? " disabled" : "") + ">Lock lineup</button>";
 }
 
 function renderCall() {
-  var tag = TODAY[S.lane], h = hero(S.lineup[S.lane]), m = match(h, tag);
+  var tag = TODAY[S.lane];
   $stage.innerHTML =
-    '<div class="lane c-' + tag + '"><span class="lane-name">Lane ' + (S.lane + 1) + " · " + LABEL[tag] + " · round " + (S.round + 1) + " of " + ROUNDS + "</span></div>" +
+    '<div class="lane c-' + tag + '"><span class="lane-name">' + LABEL[tag] + " · round " + (S.round + 1) + " of " + ROUNDS + "</span></div>" +
     "<h2>Commit a call</h2>" +
-    '<div class="note">You see the question after you commit. <b>' + h.name + "</b> has " + h.w[tag] + "/3 in " + LABEL[tag] + ", so every push here is ×" + (1 + m).toFixed(1) + ".</div>" +
+    '<div class="note">You see the question after you commit. ' + ACTION[tag] + "</div>" +
     '<div class="calls">' + Object.keys(CALLS).map(function (k) {
       return '<button class="call k-' + k + '" data-act="call" data-k="' + k + '"><b>' + k + "</b><span>" + CALLS[k] + "</span></button>";
     }).join("") + "</div>";
@@ -423,7 +418,7 @@ function renderCall() {
 function renderQuestion() {
   var tag = TODAY[S.lane], q = S.q;
   $stage.innerHTML =
-    '<div class="seed c-' + tag + '"><span class="lane-name">' + LABEL[tag] + " · round " + (S.round + 1) + '</span><span class="label">called <span class="tag k-' + S.calls[S.lane][S.round] + '">' + S.calls[S.lane][S.round] + "</span></span></div>" +
+    '<div class="seed c-' + tag + '"><span class="lane-name">' + SHORT[tag] + " · round " + (S.round + 1) + '</span><span class="label">called <span class="tag k-' + S.calls[S.lane][S.round] + '">' + S.calls[S.lane][S.round] + "</span></span></div>" +
     '<div class="timer c-' + tag + '"><div id="tbar"></div></div>' +
     '<div class="q">' + q.q + "</div>" + (q.mystery ? '<div class="note">Crowd round: there is no right answer. You score if you match the crowd.</div>' : "") +
     '<div class="opts">' + q.opts.map(function (o, i) { return '<button class="opt" data-act="answer" data-i="' + i + '">' + o + "</button>"; }).join("") + "</div>";
@@ -436,21 +431,39 @@ function renderQuestion() {
   }, 100);
 }
 
-function renderReveal() {
-  var i = S.lane, ri = S.round, tag = TODAY[i], r = S.rounds[i][ri], me = hero(S.lineup[i]);
-  var call = S.calls[i][ri], done = laneDone(i), w = laneWinner(i);
-  var verdict = r.step > 0 ? "You push the lane" : r.step < 0 ? "Pushed back" : "Held";
-  if (done) verdict = w === "you" ? "You take the lane" : w === "ghost" ? "Lane lost" : "Lane tied";
-  var answered = S.q.mystery
+function answeredLine(r) {
+  return S.q.mystery
     ? (r.pick === null ? "Time's up. " : "") + "No right answer. The crowd picked " + S.q.right + (r.right ? ": you matched it." : ": you didn't match it.")
     : r.pick === null ? "Time's up. It was " + S.q.right + "." : (r.right ? "Correct: " + S.q.right : "Wrong. It was " + S.q.right + ".");
+}
+
+// A right DEF answer: pick the lane your shield goes on, then the round is played.
+function renderShield() {
+  $stage.innerHTML =
+    '<div class="label">Round ' + (S.round + 1) + " of " + ROUNDS + '</div>' +
+    '<div class="verdict c-def">Place your shield</div>' +
+    '<div class="note">' + answeredLine(S.pending) + " Pick a lane: the shield blocks the next wave there.</div>" +
+    '<div class="shields">' + TODAY.map(function (tag, i) {
+      return '<button class="slot full c-' + tag + '" data-act="shield" data-i="' + i + '"><b>🛡 ' + SHORT[tag] + "</b>space " + S.st.k[i] + "</button>";
+    }).join("") + "</div>";
+}
+
+function renderReveal() {
+  var i = S.lane, ri = S.round, tag = TODAY[i], r = S.rounds[i][ri], ev = r.ev, me = hero(S.lineup[i]);
+  var call = S.calls[i][ri], done = laneDone(i), moved = ev.to[i] - ev.from[i];
+  var verdict = ev.shield !== undefined ? "Shield on " + SHORT[TODAY[ev.shield]]
+    : ev.healed !== undefined ? "Healed " + SHORT[TODAY[ev.healed]] + " +1"
+    : ev.blocked ? "Wave blocked"
+    : moved > 0 ? "You push the lane" : moved < 0 ? "Pushed back" : "Held";
+  if (done) verdict = laneWon(i) ? (tag === "def" ? "Lane held" : "Tower taken") : "Lane done";
+  var how = ev.right ? "" : " The wave " + (ev.blocked ? "was blocked by your shield." : "pushed you back 1.");
   var last = i === 2;
   $stage.innerHTML =
     '<div class="label">Round ' + (ri + 1) + " of " + ROUNDS + '</div>' +
     '<div class="verdict c-' + tag + '">' + verdict + "</div>" +
-    '<div class="note">' + answered + (call === "TILT" && r.right ? " TILT landed " + (r.heads ? "heads (+5)." : "tails (−2).") : "") + " Marker on space " + S.k[i] + " of 5.</div>" +
+    '<div class="note">' + answeredLine(r) + (call === "TILT" && ev.right && tag === "str" ? " TILT landed " + (r.heads ? "heads (+3)." : "tails (−1).") : "") + how + " Marker on space " + S.st.k[i] + " of 5.</div>" +
     '<div class="cols">' +
-      '<div class="side"><span class="who">You</span><span class="crit ' + (r.step > 0 ? "win" : r.step < 0 ? "lose" : "") + '">' + me.e + '</span><span class="hn">' + me.name + '</span><span class="line"><span class="tag k-' + call + '">' + call + "</span> · " + LABEL[tag] + " " + me.w[tag] + "/3 · ×" + (1 + match(me, tag)).toFixed(1) + '</span><span class="pushv ' + cls(r.mine) + '">' + fmt(r.mine) + "</span></div>" +
+      '<div class="side"><span class="who">You</span><span class="crit ' + (moved > 0 || ev.shield !== undefined || ev.healed !== undefined ? "win" : moved < 0 ? "lose" : "") + '">' + me.e + '</span><span class="hn">' + me.name + '</span><span class="line"><span class="tag k-' + call + '">' + call + "</span> · " + SHORT[tag] + '</span><span class="pushv ' + cls(moved) + '">' + fmt(moved) + "</span></div>" +
     "</div>" +
     (S.q.mystery ? '<div class="note">Nothing to look up on this one.</div>' : '<div><div class="label" style="margin-bottom:8px">How did you get it? (no points either way)</div><div class="chips">' +
       ["I knew it", "I guessed", "I looked it up"].map(function (t, k) {
@@ -460,19 +473,14 @@ function renderReveal() {
 }
 
 function renderResult() {
-  var wins = [0, 1, 2].map(laneWinner);
-  var won = wins.filter(function (w) { return w === "you"; }).length;
-  var lost = wins.filter(function (w) { return w === "ghost"; }).length;
-  var total = 0, hon = [0, 0, 0];
-  S.rounds.forEach(function (rs) { rs.forEach(function (r) { total += r.net; }); });
+  var won = [0, 1, 2].filter(laneWon).length, g = ghostState(), hon = [0, 0, 0];
   S.honesty.forEach(function (hs) { hs.forEach(function (k) { if (k !== undefined) hon[k]++; }); });
-  var head = won > lost ? "You win" : won < lost ? "" : "Draw";   // no big headline when more lanes were lost
+  var head = won >= 2 ? "You win" : "";   // no big headline otherwise
   $stage.innerHTML =
     '<div class="label">Result</div>' + (head ? '<div class="big">' + head + "</div>" : "") +
-    '<div class="note">' + won + " lane" + (won === 1 ? "" : "s") + " won, " + lost + " lost, over " + S.rounds.reduce(function (a, rs) { return a + rs.length; }, 0) + " questions. Net push " + fmt(Math.round(total * 10) / 10) + ".</div>" +
+    '<div class="note">' + won + " of 3 lanes won, over " + S.rounds.reduce(function (a, rs) { return a + rs.length; }, 0) + " questions.</div>" +
     "<div>" + [0, 1, 2].map(function (i) {
-      var w = wins[i];
-      return '<div class="row c-' + TODAY[i] + '"><span><span class="lane-name">' + LABEL[TODAY[i]] + "</span> · " + hero(S.lineup[i]).e + " " + hero(S.lineup[i]).name + '</span><span class="mono ' + (w === "you" ? "pos" : w === "ghost" ? "neg" : "") + '">' + (w === "you" ? "won" : w === "ghost" ? "lost" : "tied") + " · space " + S.k[i] + "</span></div>";
+      return '<div class="row c-' + TODAY[i] + '"><span><span class="lane-name">' + SHORT[TODAY[i]] + "</span> · " + hero(S.lineup[i]).e + " " + hero(S.lineup[i]).name + '</span><span class="mono ' + (laneWon(i) ? "pos" : "") + '">' + "space " + S.st.k[i] + " · " + laneState(i) + " · ghost: space " + g.k[i] + "</span></div>";
     }).join("") + "</div>" +
     '<div class="note">Declared: ' + hon[0] + " knew, " + hon[1] + " guessed, " + hon[2] + " looked up.</div>" +
     '<button class="btn" data-act="again">Play again</button>';
@@ -483,21 +491,24 @@ function render() {
   if (S.phase === "draft") renderDraft();
   else if (S.phase === "call") renderCall();
   else if (S.phase === "question") renderQuestion();
+  else if (S.phase === "shield") renderShield();
   else if (S.phase === "reveal") renderReveal();
   else renderResult();
 }
 
 // ---- actions ----
+function playRound(r, shieldLane) {
+  var i = S.lane, ri = S.round;
+  r.ev = LANES.play(S.st, i, S.calls[i][ri], r.right, r.heads, shieldLane);
+  S.rounds[i].push(r);
+  S.pending = null;
+  S.phase = "reveal";
+}
 function resolve(pick) {
   clearInterval(timerId);
-  var i = S.lane, ri = S.round, tag = TODAY[i], right = pick !== null && S.q.opts[pick] === S.q.right;
-  var heads = Math.random() < 0.5, g = GHOST[i].rounds[ri];
-  var mine = pushOf(S.calls[i][ri], right, heads, match(hero(S.lineup[i]), tag));
-  var theirs = pushOf(g.call, g.right, g.heads, match(hero(GHOST[i].hero), tag));
-  var net = Math.round((mine - theirs) * 10) / 10, step = net > 0 ? 1 : net < 0 ? -1 : 0;
-  S.k[i] = Math.max(1, Math.min(5, S.k[i] + step));
-  S.rounds[i].push({ pick: pick, right: right, heads: heads, mine: mine, theirs: theirs, net: net, step: step });
-  S.phase = "reveal";
+  var r = { pick: pick, right: pick !== null && S.q.opts[pick] === S.q.right, heads: Math.random() < 0.5 };
+  if (r.right && TODAY[S.lane] === "def") { S.pending = r; S.phase = "shield"; }
+  else playRound(r);
   render();
 }
 
@@ -510,6 +521,7 @@ document.addEventListener("click", function (e) {
     if (at >= 0) S.lineup[at] = null;
     else { var free = S.lineup.indexOf(null); if (free >= 0) S.lineup[free] = id; }
   } else if (act === "slot") {
+    if (S.phase !== "draft") return;
     S.lineup[+b.getAttribute("data-i")] = null;
   } else if (act === "lock") {
     S.phase = "call"; S.lane = 0; S.round = 0;
@@ -519,6 +531,8 @@ document.addEventListener("click", function (e) {
     S.phase = "question";
   } else if (act === "answer") {
     resolve(+b.getAttribute("data-i")); return;
+  } else if (act === "shield") {
+    playRound(S.pending, +b.getAttribute("data-i"));
   } else if (act === "honest") {
     S.honesty[S.lane][S.round] = +b.getAttribute("data-k");
   } else if (act === "next") {

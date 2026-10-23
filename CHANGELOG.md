@@ -4,6 +4,17 @@ Newest first. Times are Hawaii time (HST). The page shows its version in the low
 
 ---
 
+## v0.4 — "Creep Waves"
+**Fri Oct 23, 2026 · 4:05 AM HST**
+
+- Three lanes with their own topic and action, played in order: DEF (history), then STR (body, moon and Earth), then INT (science and tech). Every lane plays all 5 rounds; rounds 2 and 4 are crowd rounds.
+- You play the map, not the ghost: a wrong answer lets the map's creep wave push you back a space, on top of your call's penalty. STR right pushes forward by your call (CLUTCH +2, FEED +1, TILT +3 or −1); reaching space 5 takes the tower. INT right heals +1 there, or your lowest lane once its tower is taken. DEF right puts a shield on any lane you pick, which blocks the next wave there; DEF is won by holding space 3.
+- The ghost is another run on its own track (a dashed ring on the board), compared lane by lane. It never moves your marker.
+- 15 new questions, 5 per lane. The rules live in `public/engine/lanes.js`, with tests.
+- Removed: the tug of war against the ghost, the hero weights and their bars (SCI, ART, PLC, POP), the four old categories and their 20 questions, the random 0-or-1 mystery round, a lane ending early at space 1 or 5, and the "Draw" headline.
+
+---
+
 ## v0.3.1
 **Fri Oct 23, 2026 · 3:22 AM HST**
 
