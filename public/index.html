@@ -127,8 +127,10 @@ h1 { font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-hei
 .fanboard:has(.pad.p0:hover) .nx.l0 .t, .fanboard:has(.pad.p0:focus-visible) .nx.l0 .t,
 .fanboard:has(.pad.p1:hover) .nx.l1 .t, .fanboard:has(.pad.p1:focus-visible) .nx.l1 .t,
 .fanboard:has(.pad.p2:hover) .nx.l2 .t, .fanboard:has(.pad.p2:focus-visible) .nx.l2 .t { stroke: var(--lc); stroke-width: 2; }
-.pad .plus { font: 700 15px var(--f-display); fill: var(--fg); stroke: var(--ink); stroke-width: 3px; paint-order: stroke; opacity: 0; pointer-events: none; }
-.pad:hover .plus, .pad:focus-visible .plus { opacity: 1; }
+.fanboard .plus { font: 700 15px var(--f-display); fill: var(--fg); stroke: var(--ink); stroke-width: 3px; paint-order: stroke; opacity: 0; pointer-events: none; }
+.fanboard:has(.pad.p0:hover) .plus.l0, .fanboard:has(.pad.p0:focus-visible) .plus.l0,
+.fanboard:has(.pad.p1:hover) .plus.l1, .fanboard:has(.pad.p1:focus-visible) .plus.l1,
+.fanboard:has(.pad.p2:hover) .plus.l2, .fanboard:has(.pad.p2:focus-visible) .plus.l2 { opacity: 1; }
 .fan .mk { fill: var(--lc); stroke: var(--fg); stroke-width: 2; }
 .tw { fill: var(--mute); stroke: var(--ink); stroke-width: 1; stroke-linejoin: round; }
 .tws { filter: brightness(.55); }
@@ -314,8 +316,8 @@ function renderBoard() {
       });
     }
     var padHtml = wrap(slab(ring(pad.x, pad.y, PAD_R, 16), true));   // your start pad, lit; in the pick phase it is the lane's button
-    var plus = S.phase === "heal" ? '<text class="plus" x="' + proj(pad).x + '" y="' + (proj(pad).y + 12) + '" text-anchor="middle" dominant-baseline="central">+1</text>' : "";   // shown when you hover the pad
-    tiles.push({ y: pad.y, html: padsLive() ? '<g class="pad p' + i + ' c-' + tag + '" data-act="' + (S.phase === "pick" ? "lane" : "heal") + '" data-i="' + i + '" role="button" tabindex="0" aria-label="' + (S.phase === "pick" ? LABEL[tag] : "Heal " + SHORT[tag]) + '">' + padHtml + plus + "</g>" : padHtml });
+    if (S.phase === "heal") tokens.push({ y: 1e6, html: '<text class="plus l' + i + '" x="' + proj(pad).x + '" y="' + proj(pad).y + '" text-anchor="middle" dominant-baseline="central">+1</text>' });   // the pad's centre, drawn over the marker; shown when you hover the pad
+    tiles.push({ y: pad.y, html: padsLive() ? '<g class="pad p' + i + ' c-' + tag + '" data-act="' + (S.phase === "pick" ? "lane" : "heal") + '" data-i="' + i + '" role="button" tabindex="0" aria-label="' + (S.phase === "pick" ? LABEL[tag] : "Heal " + SHORT[tag]) + '">' + padHtml + "</g>" : padHtml });
     var at = function (n) { return n === 0 ? pad : flat(i, D0 + CELL * (5 - n + 0.5), 0); };   // the middle of space n (0: the start pad)
     var m = proj(at(k));
     tokens.push({ y: at(k).y, html: wrap('<ellipse class="shadow" cx="' + m.x + '" cy="' + m.y + '" rx="9" ry="4.5"/><circle class="mk" cx="' + m.x + '" cy="' + (m.y - 9) + '" r="9"/>') });
