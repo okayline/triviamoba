@@ -109,7 +109,7 @@ h1 { font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-hei
 .row:first-of-type { border-top: 0; }
 .big { font: 700 44px/1 var(--f-display); }
 #board { width: min(760px, calc(100vw - 32px)); justify-self: center; }   /* the board is wider than the panels below it */
-.fanboard { width: calc(100% + 20px); margin: -6px -10px 0; height: auto; display: block; }
+.fanboard { width: calc(100% + 20px); margin: -6px -10px 0; height: auto; display: block; overflow: visible; }   /* so a pad's glow isn't cut off at the frame */
 .fanboard .floor { fill: var(--panel-2); opacity: .5; stroke: var(--line); stroke-width: 1; }
 .fan { opacity: .6; }
 .fan.now, .fan.twr { opacity: 1; }   /* the towers are never dimmed */
@@ -118,6 +118,17 @@ h1 { font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-hei
 .hubg .t { fill: var(--panel-2); stroke: var(--line); }
 .fanboard .sd { filter: brightness(.55); }
 .fan .shadow { fill: #000; opacity: .45; }
+.fanboard .shadow, .fanboard .mk, .fanboard .creep { pointer-events: none; }
+.pad { cursor: pointer; outline: none; }
+.pad:hover, .pad:focus-visible { filter: drop-shadow(0 0 3px var(--lc)) drop-shadow(0 0 9px var(--lc)); }   /* light up: a glow from around the edges */
+.fanboard:has(.pad.p0:hover) .nx.l0, .fanboard:has(.pad.p0:focus-visible) .nx.l0,
+.fanboard:has(.pad.p1:hover) .nx.l1, .fanboard:has(.pad.p1:focus-visible) .nx.l1,
+.fanboard:has(.pad.p2:hover) .nx.l2, .fanboard:has(.pad.p2:focus-visible) .nx.l2 { filter: drop-shadow(0 0 3px var(--lc)) drop-shadow(0 0 8px var(--lc)); }   /* the cell the heal would fill glows */
+.fanboard:has(.pad.p0:hover) .nx.l0 .t, .fanboard:has(.pad.p0:focus-visible) .nx.l0 .t,
+.fanboard:has(.pad.p1:hover) .nx.l1 .t, .fanboard:has(.pad.p1:focus-visible) .nx.l1 .t,
+.fanboard:has(.pad.p2:hover) .nx.l2 .t, .fanboard:has(.pad.p2:focus-visible) .nx.l2 .t { stroke: var(--lc); stroke-width: 2; }
+.pad .plus { font: 700 15px var(--f-display); fill: var(--fg); stroke: var(--ink); stroke-width: 3px; paint-order: stroke; opacity: 0; pointer-events: none; }
+.pad:hover .plus, .pad:focus-visible .plus { opacity: 1; }
 .fan .mk { fill: var(--lc); stroke: var(--fg); stroke-width: 2; }
 .tw { fill: var(--mute); stroke: var(--ink); stroke-width: 1; stroke-linejoin: round; }
 .tws { filter: brightness(.55); }
@@ -133,11 +144,11 @@ h1 { font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-hei
 <div class="wrap">
   <header>
     <h1>TriviaMoba</h1>
-    <div class="sub">Prototype with sample data: 3 lanes (DEF, STR, INT), 5 rounds a lane against the map's creep waves. Nothing is saved.</div>
+    <div class="sub">Prototype with sample data: 3 lanes (DEF, STR, INT) against the map's creep waves: fill one to win. Nothing is saved.</div>
   </header>
   <section id="board" aria-label="Lanes"></section>
   <main id="stage" class="panel" aria-live="polite"></main>
-  <div class="ver">v0.5.3</div>
+  <div class="ver">v0.6</div>
 </div>
 
 <script src="engine/lanes.js"></script>
@@ -149,7 +160,6 @@ var LABEL = { def: "DEF · History", str: "STR · Body, Moon & Earth", int: "INT
 var SHORT = { def: "DEF", str: "STR", int: "INT" };
 var SEED = "3f9a·c07e·51b2";
 var TIME = 15;                                   // seconds per question
-var ROUNDS = LANES.ROUNDS;
 
 var HEROES = [
   { id: "marie", name: "Marie", e: "🦉", c: "#4fd1c5" },
@@ -216,10 +226,10 @@ var S;
 var timerId = null;
 function fresh() {
   clearInterval(timerId);
-  S = { phase: "draft", lane: 0, round: 0, lineup: [null, null, null], st: LANES.fresh(), rounds: [[], [], []],
+  S = { phase: "draft", lane: -1, lineup: [null, null, null], st: LANES.fresh(), rounds: [[], [], []],
         q: null, used: {}, usedM: {}, pending: null };
 }
-function laneDone(i) { return S.rounds[i].length >= ROUNDS; }
+function roundsPlayed() { return S.rounds.reduce(function (a, rs) { return a + rs.length; }, 0); }
 function laneWon(i) { return LANES.won(S.st, i); }
 
 function pickMystery() {
@@ -231,8 +241,8 @@ function pickMystery() {
   for (var i = 0; i < item.a.length; i++) { r -= item.a[i][1]; if (r < 0) { pick = item.a[i][0]; break; } }
   return { q: item.q, right: pick, opts: shuffle(item.a.map(function (o) { return o[0]; })), mystery: true };   // "right" = the crowd's pick, by the counts
 }
-function pickQuestion(tag, lane, round) {
-  if (LANES.CROWD_ROUNDS.indexOf(round) >= 0) return pickMystery();
+function pickQuestion(tag, lane) {
+  if (LANES.isCrowd(S.rounds[lane].length)) return pickMystery();
   var pool = QS[tag].filter(function (_, i) { return !S.used[tag + i]; });
   if (!pool.length) pool = QS[tag];
   var item = pool[Math.floor(Math.random() * pool.length)];
@@ -277,28 +287,25 @@ function tower(i, d, down, side) {
   var cx = (t[0].x + t[2].x) / 2, cy = (t[0].y + t[2].y) / 2;
   return '<g class="tws">' + sides + '</g><polygon class="tw top" points="' + pts(t) + '"/>' + (down ? "" : '<circle class="orb ' + side + '" cx="' + cx.toFixed(1) + '" cy="' + (cy - 3).toFixed(1) + '" r="3.5"/>');
 }
-function isNow(i) { return (S.phase === "question" || S.phase === "shield" || S.phase === "reveal") && S.lane === i; }
-function laneState(i) {
-  if (laneWon(i)) return "tower taken";
-  if (laneDone(i)) return "done";
-  return isNow(i) ? "round " + (S.round + 1) + " of " + ROUNDS : "open";
-}
+function isNow(i) { return (S.phase === "question" || S.phase === "shield" || S.phase === "heal" || S.phase === "reveal") && S.lane === i; }
+function padsLive() { return S.phase === "pick" || S.phase === "heal"; }   // the start pads are the buttons
+function laneState(i) { return laneWon(i) ? "tower taken" : "open"; }
 function renderBoard() {
   var floor = [proj({ x: 0, y: 0 })];
   for (var a = 150; a >= 30; a -= 10) floor.push(proj({ x: Math.cos(a * Math.PI / 180) * 212, y: Math.sin(a * Math.PI / 180) * 212 }));
   var tiles = [{ y: 0, html: '<g class="hubg">' + slab(ring(0, 0, 26, 18), false) + '<text class="hubt" x="' + HUB.x + '" y="' + (HUB.y - 1) + '" text-anchor="middle" dominant-baseline="central">GOAL</text></g>' }];
   var tokens = [];
   TODAY.forEach(function (tag, i) {
-    var k = S.st.k[i], wrap = function (h, twr) { return '<g class="fan c-' + tag + (isNow(i) ? " now" : "") + (twr ? " twr" : "") + '">' + h + "</g>"; };
+    var k = S.st.k[i], wrap = function (h, extra) { return '<g class="fan c-' + tag + (isNow(i) || padsLive() ? " now" : "") + (extra ? " " + extra : "") + '">' + h + "</g>"; };
     for (var j = 1; j <= 5; j++) {
       var d0 = D0 + (j - 1) * CELL + 2, d1 = D0 + j * CELL - 2;
       var c = [flat(i, d0, -HALF), flat(i, d1, -HALF), flat(i, d1, HALF), flat(i, d0, HALF)].map(proj);
-      tiles.push({ y: flat(i, (d0 + d1) / 2, 0).y, html: wrap(slab(c, 6 - j <= k)) });   // tile j from the hub is space 6 − j
+      tiles.push({ y: flat(i, (d0 + d1) / 2, 0).y, html: wrap(slab(c, 6 - j <= k), S.phase === "heal" && 6 - j === k + 1 ? "nx l" + i : "") });   // tile j from the hub is space 6 − j; in the heal phase the next tile is marked, to light up when you hover the pad
     }
     var pad = flat(i, D0 + LEN + PAD_R + 6, 0);
     var taken = laneWon(i);
-    tiles.push({ y: flat(i, D0 + 75, HALF + 11).y, html: wrap(tower(i, D0 + 75, taken, "far"), true) });          // the goal's tower, beside the middle tile (space 3)
-    tiles.push({ y: flat(i, D0 + LEN - 15, HALF + 11).y, html: wrap(tower(i, D0 + LEN - 15, false, "me"), true) });   // your tower, out at the edge
+    tiles.push({ y: flat(i, D0 + 75, HALF + 11).y, html: wrap(tower(i, D0 + 75, taken, "far"), "twr") });          // the goal's tower, beside the middle tile (space 3)
+    tiles.push({ y: flat(i, D0 + LEN - 15, HALF + 11).y, html: wrap(tower(i, D0 + LEN - 15, false, "me"), "twr") });   // your tower, out at the edge
     for (var cj = 1; cj <= 5; cj++) {
       if (cj === k) continue;
       [-10, 10].forEach(function (o) {
@@ -306,7 +313,9 @@ function renderBoard() {
         tokens.push({ y: fp.y, html: wrap('<ellipse class="shadow" cx="' + sp.x + '" cy="' + sp.y + '" rx="4" ry="2"/><circle class="creep ' + (cj < k ? "me" : "far") + '" cx="' + sp.x + '" cy="' + (sp.y - 5) + '" r="3.5"/>') });
       });
     }
-    tiles.push({ y: pad.y, html: wrap(slab(ring(pad.x, pad.y, PAD_R, 16), true)) });   // your start pad, lit
+    var padHtml = wrap(slab(ring(pad.x, pad.y, PAD_R, 16), true));   // your start pad, lit; in the pick phase it is the lane's button
+    var plus = S.phase === "heal" ? '<text class="plus" x="' + proj(pad).x + '" y="' + (proj(pad).y + 12) + '" text-anchor="middle" dominant-baseline="central">+1</text>' : "";   // shown when you hover the pad
+    tiles.push({ y: pad.y, html: padsLive() ? '<g class="pad p' + i + ' c-' + tag + '" data-act="' + (S.phase === "pick" ? "lane" : "heal") + '" data-i="' + i + '" role="button" tabindex="0" aria-label="' + (S.phase === "pick" ? LABEL[tag] : "Heal " + SHORT[tag]) + '">' + padHtml + plus + "</g>" : padHtml });
     var at = function (n) { return n === 0 ? pad : flat(i, D0 + CELL * (5 - n + 0.5), 0); };   // the middle of space n (0: the start pad)
     var m = proj(at(k));
     tokens.push({ y: at(k).y, html: wrap('<ellipse class="shadow" cx="' + m.x + '" cy="' + m.y + '" rx="9" ry="4.5"/><circle class="mk" cx="' + m.x + '" cy="' + (m.y - 9) + '" r="9"/>') });
@@ -342,7 +351,7 @@ function renderDraft() {
   $stage.innerHTML =
     '<div class="seed"><span class="label">Day seed</span><span class="mono">' + SEED + '</span><span class="label">3 lanes sealed</span></div>' +
     "<h2>Draft your lanes</h2>" +
-    '<div class="note">Pick 3 of 6 heroes, one per lane. You play DEF first, then STR, then INT, 5 rounds each. Every wrong answer lets the map\'s creep wave push you back a space.</div>' +
+    '<div class="note">Pick 3 of 6 heroes, one per lane. Fill one lane to win. Every wrong answer lets the map\'s creep wave push you back a space.</div>' +
     '<div class="slots">' + slots + "</div>" +
     '<div class="heroes">' + cards + "</div>" +
     '<button class="btn" data-act="lock"' + (picked < 3 ? " disabled" : "") + ">Lock lineup</button>";
@@ -351,7 +360,7 @@ function renderDraft() {
 function renderQuestion() {
   var tag = TODAY[S.lane], q = S.q;
   $stage.innerHTML =
-    '<div class="seed c-' + tag + '"><span class="lane-name">' + LABEL[tag] + " · round " + (S.round + 1) + " of " + ROUNDS + "</span></div>" +
+    '<div class="seed c-' + tag + '"><span class="lane-name">' + LABEL[tag] + " · round " + (roundsPlayed() + 1) + "</span></div>" +
     '<div class="timer c-' + tag + '"><div id="tbar"></div></div>' +
     '<div class="q">' + q.q + "</div>" + (q.mystery ? '<div class="note">Crowd round: there is no right answer. You score if you match the crowd.</div>' : "") +
     '<div class="opts">' + q.opts.map(function (o, i) { return '<button class="opt" data-act="answer" data-i="' + i + '">' + o + "</button>"; }).join("") + "</div>";
@@ -367,13 +376,13 @@ function renderQuestion() {
 function answeredLine(r) {
   return S.q.mystery
     ? (r.pick === null ? "Time's up. " : "") + "No right answer. The crowd picked " + S.q.right + (r.right ? ": you matched it." : ": you didn't match it.")
-    : r.pick === null ? "Time's up. It was " + S.q.right + "." : (r.right ? "Correct: " + S.q.right : "Wrong. It was " + S.q.right + ".");
+    : r.pick === null ? "Time's up. It was " + S.q.right + "." : (r.right ? "Correct: " + S.q.right + "." : "Wrong. It was " + S.q.right + ".");
 }
 
 // A right DEF answer: pick the lane your shield goes on, then the round is played.
 function renderShield() {
   $stage.innerHTML =
-    '<div class="label">Round ' + (S.round + 1) + " of " + ROUNDS + '</div>' +
+    '<div class="label">Round ' + (roundsPlayed() + 1) + '</div>' +
     '<div class="verdict c-def">Place your shield</div>' +
     '<div class="note">' + answeredLine(S.pending) + " Pick a lane: the shield blocks the next wave there.</div>" +
     '<div class="shields">' + TODAY.map(function (tag, i) {
@@ -382,40 +391,52 @@ function renderShield() {
 }
 
 function renderReveal() {
-  var i = S.lane, ri = S.round, tag = TODAY[i], r = S.rounds[i][ri], ev = r.ev, me = hero(S.lineup[i]);
-  var done = laneDone(i), moved = ev.to[i] - ev.from[i];
+  var i = S.lane, tag = TODAY[i], r = S.rounds[i][S.rounds[i].length - 1], ev = r.ev, me = hero(S.lineup[i]);
+  var over = LANES.winner(S.st) >= 0, at = ev.healed !== undefined ? ev.healed : i, moved = ev.to[at] - ev.from[at];
   var verdict = ev.shield !== undefined ? (moved > 0 ? "Pushed, shield on " : "Shield on ") + SHORT[TODAY[ev.shield]]
     : ev.healed !== undefined ? "Healed " + SHORT[TODAY[ev.healed]] + " +1"
     : ev.blocked ? "Wave blocked"
     : moved > 0 ? "You push the lane" : moved < 0 ? "Pushed back" : "Held";
-  if (done) verdict = laneWon(i) ? "Tower taken" : "Lane done";
+  if (over) verdict = "Tower taken";
   var how = ev.right ? "" : " The wave " + (ev.blocked ? "was blocked by your shield." : "pushed you back 1.");
-  var last = i === 2;
   $stage.innerHTML =
-    '<div class="label">Round ' + (ri + 1) + " of " + ROUNDS + '</div>' +
+    '<div class="label">Round ' + roundsPlayed() + '</div>' +
     '<div class="verdict c-' + tag + '">' + verdict + "</div>" +
-    '<div class="note">' + answeredLine(r) + how + " Marker on space " + S.st.k[i] + " of 5.</div>" +
+    '<div class="note">' + answeredLine(r) + how + " Marker on space " + S.st.k[at] + " of 5.</div>" +
     '<div class="cols">' +
       '<div class="side"><span class="who">You</span><span class="crit ' + (moved > 0 || ev.shield !== undefined || ev.healed !== undefined ? "win" : moved < 0 ? "lose" : "") + '">' + me.e + '</span><span class="hn">' + me.name + '</span><span class="line">' + SHORT[tag] + '</span><span class="pushv ' + cls(moved) + '">' + fmt(moved) + "</span></div>" +
     "</div>" +
-    '<button class="btn" data-act="next">' + (!done ? "Next round" : last ? "See result" : "Next lane") + "</button>";
+    '<button class="btn" data-act="next">' + (over ? "See result" : "Next round") + "</button>";
 }
 
 function renderResult() {
-  var won = [0, 1, 2].filter(laneWon).length;
-  var head = won >= 2 ? "You win" : "";   // no big headline otherwise
+  var w = LANES.winner(S.st), n = roundsPlayed();
   $stage.innerHTML =
-    '<div class="label">Result</div>' + (head ? '<div class="big">' + head + "</div>" : "") +
-    '<div class="note">' + won + " of 3 lanes won, over " + S.rounds.reduce(function (a, rs) { return a + rs.length; }, 0) + " questions.</div>" +
+    '<div class="label">Result</div><div class="big">You win</div>' +
+    '<div class="note">' + SHORT[TODAY[w]] + " tower taken in " + n + (n === 1 ? " round." : " rounds.") + "</div>" +
     "<div>" + [0, 1, 2].map(function (i) {
       return '<div class="row c-' + TODAY[i] + '"><span><span class="lane-name">' + SHORT[TODAY[i]] + "</span> · " + hero(S.lineup[i]).e + " " + hero(S.lineup[i]).name + '</span><span class="mono ' + (laneWon(i) ? "pos" : "") + '">' + (S.st.k[i] ? "space " + S.st.k[i] : "start pad") + " · " + laneState(i) + "</span></div>";
     }).join("") + "</div>" +
     '<button class="btn" data-act="again">Play again</button>';
 }
 
+// A right INT answer: tap the start pad of the lane to heal; it shows +1 when you hover it.
+function renderHeal() {
+  $stage.innerHTML =
+    '<div class="label">Round ' + (roundsPlayed() + 1) + '</div>' +
+    '<div class="verdict c-int">Heal a lane</div>' +
+    '<div class="note">' + answeredLine(S.pending) + " Tap a start pad.</div>";
+}
+
+function renderPick() {
+  $stage.innerHTML = '<div class="label">Round ' + (roundsPlayed() + 1) + ' · tap a start pad</div>';
+}
+
 function render() {
   renderBoard();
   if (S.phase === "draft") renderDraft();
+  else if (S.phase === "pick") renderPick();
+  else if (S.phase === "heal") renderHeal();
   else if (S.phase === "question") renderQuestion();
   else if (S.phase === "shield") renderShield();
   else if (S.phase === "reveal") renderReveal();
@@ -423,10 +444,10 @@ function render() {
 }
 
 // ---- actions ----
-function ask() { S.q = pickQuestion(TODAY[S.lane], S.lane, S.round); S.phase = "question"; }
-function playRound(r, shieldLane) {
-  var i = S.lane, ri = S.round;
-  r.ev = LANES.play(S.st, i, r.right, shieldLane);
+function ask() { S.q = pickQuestion(TODAY[S.lane], S.lane); S.phase = "question"; }
+function playRound(r, target) {
+  var i = S.lane;
+  r.ev = LANES.play(S.st, i, r.right, target);
   S.rounds[i].push(r);
   S.pending = null;
   S.phase = "reveal";
@@ -435,6 +456,7 @@ function resolve(pick) {
   clearInterval(timerId);
   var r = { pick: pick, right: pick !== null && S.q.opts[pick] === S.q.right };
   if (r.right && TODAY[S.lane] === "def") { S.pending = r; S.phase = "shield"; }
+  else if (r.right && TODAY[S.lane] === "int") { S.pending = r; S.phase = "heal"; }
   else playRound(r);
   render();
 }
@@ -451,19 +473,27 @@ document.addEventListener("click", function (e) {
     if (S.phase !== "draft") return;
     S.lineup[+b.getAttribute("data-i")] = null;
   } else if (act === "lock") {
-    S.lane = 0; S.round = 0; ask();
+    S.phase = "pick";
+  } else if (act === "lane") {
+    if (S.phase !== "pick") return;
+    S.lane = +b.getAttribute("data-i"); ask();
   } else if (act === "answer") {
     resolve(+b.getAttribute("data-i")); return;
+  } else if (act === "heal") {
+    if (S.phase !== "heal") return;
+    playRound(S.pending, +b.getAttribute("data-i"));
   } else if (act === "shield") {
     playRound(S.pending, +b.getAttribute("data-i"));
   } else if (act === "next") {
-    if (!laneDone(S.lane)) { S.round++; ask(); }
-    else if (S.lane === 2) S.phase = "result";
-    else { S.lane++; S.round = 0; ask(); }
+    S.phase = LANES.winner(S.st) >= 0 ? "result" : "pick"; S.lane = -1;
   } else if (act === "again") {
     fresh();
   }
   render();
+});
+
+document.addEventListener("keydown", function (e) {
+  if ((e.key === "Enter" || e.key === " ") && e.target.classList && e.target.classList.contains("pad")) { e.preventDefault(); e.target.dispatchEvent(new MouseEvent("click", { bubbles: true })); }
 });
 
 fresh();
