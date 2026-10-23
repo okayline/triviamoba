@@ -4,6 +4,13 @@ Newest first. Times are Hawaii time (HST). The page shows its version in the low
 
 ---
 
+## v0.4.1
+**Fri Oct 23, 2026 · 4:05 AM HST**
+
+- The lanes start further out from the goal (50 units, was 30), so the chunky tiles of the three lanes no longer overlap where they meet the goal. Removed: the overlap.
+
+---
+
 ## v0.4 — "Creep Waves"
 **Fri Oct 23, 2026 · 4:10 AM HST**
 
