@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
-/* Layout: the board (three lanes fanning out from your base, the ghost on its own track) with the current step's panel under it. Dark by choice: a single committed look. */
+/* Layout: the board (three lanes running in from the edges to the common goal) with the current step's panel under it. Dark by choice: a single committed look. */
 :root {
   --ink: #0c1215;
   --panel: #131c21;
@@ -56,9 +56,6 @@ h1 { font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-hei
 .lane.now .lane-name::after { content: "  ◂ now"; color: var(--mute); font: 500 11px var(--f-mono); letter-spacing: .06em; text-transform: none; }
 .track { position: relative; height: 34px; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--line); overflow: hidden; }
 .track::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--line); }
-.base { position: absolute; top: 0; bottom: 0; width: 46px; display: grid; place-items: center; font: 700 12px var(--f-display); letter-spacing: .06em; }
-.base.me { left: 0; }
-.base.gh { right: 0; color: var(--mute); }
 .marker { position: absolute; top: 4px; bottom: 4px; width: 8px; margin-left: -4px; border-radius: 3px; transition: left .5s cubic-bezier(.3,.8,.3,1); }
 .fill { position: absolute; top: 0; bottom: 0; left: 0; opacity: .22; transition: width .5s cubic-bezier(.3,.8,.3,1); }
 .lane-foot { display: flex; justify-content: space-between; font: 400 12px var(--f-mono); color: var(--mute); gap: 8px; }
@@ -66,7 +63,6 @@ h1 { font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-hei
 .c-def { --lc: var(--def); } .c-str { --lc: var(--str); } .c-int { --lc: var(--int); }
 .lane .lane-name { color: var(--lc); }
 .marker, .fill { background: var(--lc); }
-.base.me { color: var(--lc); }
 
 /* heroes */
 .heroes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
@@ -93,7 +89,6 @@ h1 { font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-hei
 /* controls */
 .btn { background: var(--fg); color: var(--ink); border: 0; border-radius: 8px; font: 700 16px var(--f-display); letter-spacing: .06em; text-transform: uppercase; padding: 14px 16px; cursor: pointer; width: 100%; }
 .btn[disabled] { opacity: .35; cursor: not-allowed; }
-.btn.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); }
 .calls { display: grid; gap: 8px; }
 .call { display: grid; grid-template-columns: 92px 1fr; gap: 10px; align-items: center; text-align: left; background: var(--panel-2); border: 1px solid var(--line); border-left: 4px solid var(--cc); border-radius: 8px; padding: 12px; color: var(--fg); font: inherit; cursor: pointer; }
 .call:hover { border-color: var(--cc); }
@@ -139,9 +134,8 @@ h1 { font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-hei
 .tw { fill: var(--mute); stroke: var(--ink); stroke-width: 1; stroke-linejoin: round; }
 .tws { filter: brightness(.55); }
 .orb.me, .creep.me { fill: var(--feed); }
-.orb.gh, .creep.gh { fill: var(--bad); }
+.orb.far, .creep.far { fill: var(--bad); }
 .creep { stroke: var(--ink); stroke-width: 1; }
-.fan .gmk { fill: none; stroke: var(--mute); stroke-width: 2; stroke-dasharray: 3 2; }   /* the ghost's place on its own track */
 .shields { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .hubt { fill: var(--fg); font: 700 11px var(--f-display); letter-spacing: .06em; }
 @media (prefers-reduced-motion: reduce) { .marker, .fill, .timer > div { transition: none; } .badge, .crit { animation: none !important; } }
@@ -151,7 +145,7 @@ h1 { font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-hei
 <div class="wrap">
   <header>
     <h1>TriviaMoba</h1>
-    <div class="sub">Prototype with sample data: 3 lanes (DEF, STR, INT), 5 rounds a lane against the map's creep waves, one scripted ghost run to compare with. Nothing is saved.</div>
+    <div class="sub">Prototype with sample data: 3 lanes (DEF, STR, INT), 5 rounds a lane against the map's creep waves. Nothing is saved.</div>
   </header>
   <section id="board" aria-label="Lanes"></section>
   <main id="stage" class="panel" aria-live="polite"></main>
@@ -209,17 +203,6 @@ var QS = {
   ]
 };
 
-// the scripted ghost: another player's earlier run of the same lanes, replayed on its own track (hand-written for the
-// prototype). It never moves your marker. `shield` is where a right DEF answer put its shield.
-var GHOST = { hero: "hale", lanes: [
-  [ { call: "FEED", right: true, shield: 1 }, { call: "FEED", right: true, shield: 2 }, { call: "CLUTCH", right: false },
-    { call: "FEED", right: true, shield: 1 }, { call: "FEED", right: false } ],
-  [ { call: "CLUTCH", right: false }, { call: "FEED", right: true }, { call: "TILT", right: true, heads: true },
-    { call: "FEED", right: false }, { call: "CLUTCH", right: true } ],
-  [ { call: "FEED", right: true }, { call: "TILT", right: false }, { call: "FEED", right: true },
-    { call: "CLUTCH", right: true }, { call: "FEED", right: false } ]
-] };
-
 // Crowd rounds have no right answer: you score by matching the crowd's pick (drawn by the counts: each option's chance
 // is its count out of the people surveyed). Prompts and counts are from ProtoQA (CC BY 4.0, https://github.com/iesl/protoqa-data),
 // top four answers only, chosen for no bad vibes. Real SCATTER answers replace them later.
@@ -262,18 +245,6 @@ function fresh() {
 function laneDone(i) { return S.rounds[i].length >= ROUNDS; }
 function laneWon(i) { return LANES.won(S.st, i); }
 
-// The ghost's track: its scripted run, replayed for as many rounds of each lane as you've played.
-function ghostState() {
-  var g = LANES.fresh();
-  for (var i = 0; i < 3; i++) {
-    for (var r = 0; r < S.rounds[i].length; r++) {
-      var x = GHOST.lanes[i][r];
-      LANES.play(g, i, x.call, x.right, !!x.heads, x.shield === undefined ? i : x.shield);
-    }
-  }
-  return g;
-}
-
 function pickMystery() {
   var pool = MYSTERY.filter(function (_, i) { return !S.usedM[i]; });
   if (!pool.length) pool = MYSTERY;
@@ -299,7 +270,7 @@ var $stage = document.getElementById("stage");
 // The board: a third of a wheel seen tilted from above, flipped: the common goal is the hub at the top, and the three
 // lanes start out at the rim and run in to it over 120 degrees, each 5 raised tiles (space 1 at the rim, space 5 by the goal). Positions are worked out on a flat board (x right, y away from you)
 // and then squashed by TILT, with every tile given DEPTH pixels of side.
-// Tiles light up to your marker as you move in; the dashed ring is the ghost's place on its own track.
+// Tiles light up to your marker as you move in.
 var HUB = { x: 200, y: 42 }, ANG = [150, 90, 30], D0 = 30, CELL = 30, LEN = 5 * CELL, TILT = 0.55, DEPTH = 9;
 function flat(i, d, off) {
   var a = ANG[i] * Math.PI / 180;
@@ -336,7 +307,6 @@ function laneState(i) {
   return isNow(i) ? "round " + (S.round + 1) + " of " + ROUNDS : "open";
 }
 function renderBoard() {
-  var g = ghostState();
   var floor = [proj({ x: 0, y: 0 })];
   for (var a = 150; a >= 30; a -= 10) floor.push(proj({ x: Math.cos(a * Math.PI / 180) * 212, y: Math.sin(a * Math.PI / 180) * 212 }));
   var tiles = [{ y: 0, html: '<g class="hubg">' + slab(ring(0, 0, 26, 18), false) + '<text class="hubt" x="' + HUB.x + '" y="' + (HUB.y - 1) + '" text-anchor="middle" dominant-baseline="central">GOAL</text></g>' }];
@@ -350,21 +320,19 @@ function renderBoard() {
     }
     var pad = flat(i, D0 + LEN + 24, 0);
     var taken = laneWon(i);
-    tiles.push({ y: flat(i, D0 + 15, 22).y, html: wrap(tower(i, D0 + 15, taken, "gh")) });          // the goal's tower, by the hub
+    tiles.push({ y: flat(i, D0 + 15, 22).y, html: wrap(tower(i, D0 + 15, taken, "far")) });          // the goal's tower, by the hub
     tiles.push({ y: flat(i, D0 + LEN - 15, 22).y, html: wrap(tower(i, D0 + LEN - 15, false, "me")) });   // your tower, out at the edge
     for (var cj = 1; cj <= 5; cj++) {
       if (cj === k) continue;
       [-5, 5].forEach(function (o) {
         var fp = flat(i, D0 + (5 - cj + 0.5) * CELL, o), sp = proj(fp);
-        tokens.push({ y: fp.y, html: wrap('<ellipse class="shadow" cx="' + sp.x + '" cy="' + sp.y + '" rx="4" ry="2"/><circle class="creep ' + (cj < k ? "me" : "gh") + '" cx="' + sp.x + '" cy="' + (sp.y - 5) + '" r="3.5"/>') });
+        tokens.push({ y: fp.y, html: wrap('<ellipse class="shadow" cx="' + sp.x + '" cy="' + sp.y + '" rx="4" ry="2"/><circle class="creep ' + (cj < k ? "me" : "far") + '" cx="' + sp.x + '" cy="' + (sp.y - 5) + '" r="3.5"/>') });
       });
     }
     tiles.push({ y: pad.y, html: wrap(slab(ring(pad.x, pad.y, 18, 14), true)) });   // your start pad, lit
     var at = function (n) { return n === 0 ? pad : flat(i, D0 + CELL * (5 - n + 0.5), 0); };   // the middle of space n (0: the start pad)
-    var m = proj(at(k)), gp = proj(pad), gm = proj(at(g.k[i]));
+    var m = proj(at(k));
     tokens.push({ y: at(k).y, html: wrap('<ellipse class="shadow" cx="' + m.x + '" cy="' + m.y + '" rx="9" ry="4.5"/><circle class="mk" cx="' + m.x + '" cy="' + (m.y - 9) + '" r="9"/>') });
-    if (S.rounds[i].length) tokens.push({ y: at(g.k[i]).y + 1, html: wrap('<circle class="gmk" cx="' + gm.x + '" cy="' + (gm.y - 9) + '" r="12"/>') });
-    tokens.push({ y: pad.y, html: wrap('<text x="' + gp.x + '" y="' + (gp.y - 9) + '" text-anchor="middle" dominant-baseline="central" font-size="22">' + (S.rounds[i].length ? hero(GHOST.hero).e : "?") + "</text>") });
   });
   var byFar = function (a, b) { return a.y - b.y; };   // the hub is furthest away now: draw from the top down
   var svg = '<polygon class="floor" points="' + pts(floor) + '"/>' +
@@ -372,14 +340,13 @@ function renderBoard() {
   var rows = TODAY.map(function (tag, i) {
     var hid = S.lineup[i];
     var me = hid ? hero(hid).e + " " + hero(hid).name : "—";
-    var gh = S.rounds[i].length ? hero(GHOST.hero).e + " " + (g.k[i] ? "space " + g.k[i] : "start pad") : "?";
     var sh = S.st.shields[i] ? " · 🛡 " + S.st.shields[i] : "";
     return '<div class="lane c-' + tag + (isNow(i) ? " now" : "") + '">' +
       '<div class="lane-top"><span class="lane-name">' + LABEL[tag] + '</span>' +
       '<span class="label">' + (S.st.k[i] ? "space " + S.st.k[i] + " of 5" : "start pad") + " · " + laneState(i) + sh + "</span></div>" +
-      '<div class="lane-foot"><span>you: <b>' + me + '</b></span><span>ghost: <b>' + gh + "</b></span></div></div>";
+      '<div class="lane-foot"><span>you: <b>' + me + "</b></span></div></div>";
   }).join("");
-  $board.innerHTML = '<div class="panel"><svg class="fanboard" viewBox="-10 8 420 190" role="img" aria-label="Three lanes of five tiles running in from the edge to the common goal at the top, with the ghost\'s run on its own track, seen from above">' + svg + "</svg>" + rows + "</div>";
+  $board.innerHTML = '<div class="panel"><svg class="fanboard" viewBox="-10 8 420 190" role="img" aria-label="Three lanes of five tiles running in from the edge to the common goal at the top, seen from above">' + svg + "</svg>" + rows + "</div>";
 }
 
 function renderDraft() {
@@ -473,14 +440,14 @@ function renderReveal() {
 }
 
 function renderResult() {
-  var won = [0, 1, 2].filter(laneWon).length, g = ghostState(), hon = [0, 0, 0];
+  var won = [0, 1, 2].filter(laneWon).length, hon = [0, 0, 0];
   S.honesty.forEach(function (hs) { hs.forEach(function (k) { if (k !== undefined) hon[k]++; }); });
   var head = won >= 2 ? "You win" : "";   // no big headline otherwise
   $stage.innerHTML =
     '<div class="label">Result</div>' + (head ? '<div class="big">' + head + "</div>" : "") +
     '<div class="note">' + won + " of 3 lanes won, over " + S.rounds.reduce(function (a, rs) { return a + rs.length; }, 0) + " questions.</div>" +
     "<div>" + [0, 1, 2].map(function (i) {
-      return '<div class="row c-' + TODAY[i] + '"><span><span class="lane-name">' + SHORT[TODAY[i]] + "</span> · " + hero(S.lineup[i]).e + " " + hero(S.lineup[i]).name + '</span><span class="mono ' + (laneWon(i) ? "pos" : "") + '">' + (S.st.k[i] ? "space " + S.st.k[i] : "start pad") + " · " + laneState(i) + " · ghost: " + (g.k[i] ? "space " + g.k[i] : "start pad") + "</span></div>";
+      return '<div class="row c-' + TODAY[i] + '"><span><span class="lane-name">' + SHORT[TODAY[i]] + "</span> · " + hero(S.lineup[i]).e + " " + hero(S.lineup[i]).name + '</span><span class="mono ' + (laneWon(i) ? "pos" : "") + '">' + (S.st.k[i] ? "space " + S.st.k[i] : "start pad") + " · " + laneState(i) + "</span></div>";
     }).join("") + "</div>" +
     '<div class="note">Declared: ' + hon[0] + " knew, " + hon[1] + " guessed, " + hon[2] + " looked up.</div>" +
     '<button class="btn" data-act="again">Play again</button>';

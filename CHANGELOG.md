@@ -10,9 +10,8 @@ Newest first. Times are Hawaii time (HST). The page shows its version in the low
 - The board is flipped: the common goal is at the top, and the three lanes start out at the edges and run in to it. You start on your lit start pad and the tiles light up as you move in.
 - Three lanes with their own topic and action, played in order: DEF (history), then STR (body, moon and Earth), then INT (science and tech). Every lane plays all 5 rounds; rounds 2 and 4 are crowd rounds. Reaching space 5 in a lane takes its tower by the goal.
 - You play the map, not the ghost: a wrong answer lets the map's creep wave push you back a space, on top of your call's penalty. STR right pushes forward by your call (CLUTCH +2, FEED +1, TILT +3 or −1). DEF right pushes the same way and puts a shield on any lane you pick, which blocks the next wave there. INT right heals +1 there, or your lowest lane once its tower is taken.
-- The ghost is another run on its own track (a dashed ring on the board), compared lane by lane. It never moves your marker.
 - 15 new questions, 5 per lane. The rules live in `public/engine/lanes.js`, with tests.
-- Removed: the tug of war against the ghost, the hero weights and their bars (SCI, ART, PLC, POP), the four old categories and their 20 questions, the random 0-or-1 mystery round, a lane ending early at space 1 or 5, starting in the middle of a lane, "YOU" on the hub (it reads GOAL), and the "Draw" headline.
+- Removed: the tug of war against the ghost, the hero weights and their bars (SCI, ART, PLC, POP), the four old categories and their 20 questions, the random 0-or-1 mystery round, a lane ending early at space 1 or 5, starting in the middle of a lane, "YOU" on the hub (it reads GOAL), the "Draw" headline, and the ghost everywhere in the page (its scripted run, its place on the board, "ghost:" on the lanes and results, and its CSS). The backend is unchanged.
 
 ---
 
