@@ -6,11 +6,11 @@
 // action; a wrong answer lets the wave through (−1), unless the lane has a shield, which blocks that one wave.
 //   STR  right: push forward 2.
 //   DEF  right: push forward 2, and place a shield on any lane (it blocks the next wave there).
-//   INT  right: heal +1 in any lane you pick (tap its start pad).
+//   INT  right: heal +2 in any lane you pick (tap its start pad).
 // Reaching space 5 in any lane takes the tower by the goal and ends the game.
 (function () {
   var LANES = ["def", "str", "int"];
-  var TOP = 5, START = 0, WAVE = 1, PUSH = 2, HEAL = 1;   // 0 is the start pad
+  var TOP = 5, START = 0, WAVE = 1, PUSH = 2, HEAL = 2;   // 0 is the start pad
   var CYCLE = 5, CROWD_ROUNDS = [1, 3];   // in each lane, its 2nd and 4th questions of every 5 are crowd rounds
 
   function fresh() { return { k: [START, START, START], shields: [0, 0, 0] }; }

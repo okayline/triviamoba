@@ -43,14 +43,13 @@ test("DEF: a right answer pushes 2 and shields any lane; a shield blocks one wav
   assert.equal(s.k[DEF], 5); assert.equal(L.winner(s), DEF); assert.equal(s.shields[DEF], 2);
 });
 
-test("INT: a right answer heals +1 in the lane you pick; five rights in INT take its tower", () => {
+test("INT: a right answer heals +2 in the lane you pick; three rights in INT take its tower", () => {
   const s = L.fresh();
-  const ev = L.play(s, INT, true, STR); assert.equal(ev.healed, STR); assert.deepEqual(s.k, [0, 1, 0]);
-  L.play(s, INT, true, INT); assert.deepEqual(s.k, [0, 1, 1]);
-  for (let n = 0; n < 3; n++) L.play(s, INT, true, INT);
-  assert.equal(s.k[INT], 4); assert.equal(L.winner(s), -1);
-  L.play(s, INT, true, DEF); assert.equal(s.k[DEF], 1);                                 // heal elsewhere
-  L.play(s, INT, true, INT); assert.equal(s.k[INT], 5); assert.equal(L.winner(s), INT);
+  const ev = L.play(s, INT, true, STR); assert.equal(ev.healed, STR); assert.deepEqual(s.k, [0, 2, 0]);
+  L.play(s, INT, true, INT); assert.deepEqual(s.k, [0, 2, 2]);
+  L.play(s, INT, true, INT); assert.equal(s.k[INT], 4); assert.equal(L.winner(s), -1);
+  L.play(s, INT, true, DEF); assert.equal(s.k[DEF], 2);                                 // heal elsewhere
+  L.play(s, INT, true, INT); assert.equal(s.k[INT], 5); assert.equal(L.winner(s), INT);   // 4 + 2, held at 5
   const t = L.fresh(); t.k[STR] = 4;
   L.play(t, INT, true, STR); assert.equal(L.winner(t), STR, "a heal can take another lane's tower");
 });

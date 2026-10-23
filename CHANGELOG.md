@@ -9,9 +9,9 @@ Newest first. Times are Hawaii time (HST). The page shows its version in the low
 
 - The game is to fill ONE spoke: reaching space 5 in any lane takes its tower and ends the game, and the result says which tower and in how many rounds. There is no round limit.
 - Every round you choose the lane by tapping its start pad on the board (the pad lights up when you hover it and works from the keyboard). The question comes from that lane. A lane's 2nd and 4th questions of every 5 are crowd rounds.
-- INT's right answer heals +1 in the lane you choose: you hover a start pad to see "+1" on it and tap it to heal (a heal can take another lane's tower).
+- INT's right answer heals +2 in the lane you choose (it was +1, which made INT the slowest spoke: 5 rights to fill, against 3 for STR and DEF): you hover a start pad to see "+2" on it and tap it to heal (a heal can take another lane's tower).
 - The "+1" sits in the exact centre of the pad and draws over the marker. Removed: its place below the centre, where the marker covered it.
-- In the heal step, hovering a start pad (or focusing it with the keyboard) makes the pad and the cell the heal would fill glow from around their edges in the lane's colour. The pad used to just brighten.
+- In the heal step, hovering a start pad (or focusing it with the keyboard) makes the pad and the cells the heal would fill glow from around their edges in the lane's colour. The pad used to just brighten.
 - Fixed: "Correct: X" ran into the next sentence ("Correct: Tungsten Marker on space…"); it now ends with a full stop.
 - Removed: the fixed order (DEF, then STR, then INT), the 5 rounds per lane and "round N of 5" (also in the header line under the title), "Next lane", the lane count on the result ("N of 3 lanes won"), the rule that a tower stays taken after the marker falls back, INT's old "heal your lowest lane once it is full", and the marker and creeps catching taps on the pads.
 
