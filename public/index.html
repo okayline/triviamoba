@@ -67,7 +67,7 @@ h1 { font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-hei
 .hero { text-align: left; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px; color: var(--fg); font: inherit; cursor: pointer; display: grid; gap: 8px; min-width: 0; }
 .hero:hover { border-color: var(--mute); }
 .hero[aria-pressed="true"] { border-color: var(--fg); background: var(--panel); }
-.hero:focus-visible, .btn:focus-visible, .opt:focus-visible, .chip:focus-visible, .slot:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+.hero:focus-visible, .btn:focus-visible, .opt:focus-visible, .slot:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
 .hero-head { display: flex; gap: 8px; align-items: center; }
 .badge { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 19px; line-height: 1; flex: none; animation: bob 2.4s ease-in-out infinite; }
 @keyframes bob { 50% { transform: translateY(-3px); } }
@@ -104,9 +104,6 @@ h1 { font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-hei
 .side .pushv { font: 700 24px var(--f-display); margin-top: 2px; }
 .pos { color: var(--feed); } .neg { color: var(--bad); }
 .verdict { font: 700 22px var(--f-display); letter-spacing: .04em; text-transform: uppercase; text-wrap: balance; }
-.chips { display: flex; gap: 6px; flex-wrap: wrap; }
-.chip { background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; color: var(--mute); font: 500 13px var(--f-body); cursor: pointer; }
-.chip[aria-pressed="true"] { border-color: var(--fg); color: var(--fg); background: var(--panel-2); }
 .note { color: var(--mute); font-size: 13px; }
 .row { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; flex-wrap: wrap; }
 .row:first-of-type { border-top: 0; }
@@ -140,7 +137,7 @@ h1 { font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-hei
   </header>
   <section id="board" aria-label="Lanes"></section>
   <main id="stage" class="panel" aria-live="polite"></main>
-  <div class="ver">v0.5.1</div>
+  <div class="ver">v0.5.2</div>
 </div>
 
 <script src="engine/lanes.js"></script>
@@ -220,7 +217,7 @@ var timerId = null;
 function fresh() {
   clearInterval(timerId);
   S = { phase: "draft", lane: 0, round: 0, lineup: [null, null, null], st: LANES.fresh(), rounds: [[], [], []],
-        honesty: [[], [], []], q: null, used: {}, usedM: {}, pending: null };
+        q: null, used: {}, usedM: {}, pending: null };
 }
 function laneDone(i) { return S.rounds[i].length >= ROUNDS; }
 function laneWon(i) { return LANES.won(S.st, i); }
@@ -401,16 +398,11 @@ function renderReveal() {
     '<div class="cols">' +
       '<div class="side"><span class="who">You</span><span class="crit ' + (moved > 0 || ev.shield !== undefined || ev.healed !== undefined ? "win" : moved < 0 ? "lose" : "") + '">' + me.e + '</span><span class="hn">' + me.name + '</span><span class="line">' + SHORT[tag] + '</span><span class="pushv ' + cls(moved) + '">' + fmt(moved) + "</span></div>" +
     "</div>" +
-    (S.q.mystery ? '<div class="note">Nothing to look up on this one.</div>' : '<div><div class="label" style="margin-bottom:8px">How did you get it? (no points either way)</div><div class="chips">' +
-      ["I knew it", "I guessed", "I looked it up"].map(function (t, k) {
-        return '<button class="chip" data-act="honest" data-k="' + k + '" aria-pressed="' + (S.honesty[i][ri] === k) + '">' + t + "</button>";
-      }).join("") + "</div></div>") +
     '<button class="btn" data-act="next">' + (!done ? "Next round" : last ? "See result" : "Next lane") + "</button>";
 }
 
 function renderResult() {
-  var won = [0, 1, 2].filter(laneWon).length, hon = [0, 0, 0];
-  S.honesty.forEach(function (hs) { hs.forEach(function (k) { if (k !== undefined) hon[k]++; }); });
+  var won = [0, 1, 2].filter(laneWon).length;
   var head = won >= 2 ? "You win" : "";   // no big headline otherwise
   $stage.innerHTML =
     '<div class="label">Result</div>' + (head ? '<div class="big">' + head + "</div>" : "") +
@@ -418,7 +410,6 @@ function renderResult() {
     "<div>" + [0, 1, 2].map(function (i) {
       return '<div class="row c-' + TODAY[i] + '"><span><span class="lane-name">' + SHORT[TODAY[i]] + "</span> · " + hero(S.lineup[i]).e + " " + hero(S.lineup[i]).name + '</span><span class="mono ' + (laneWon(i) ? "pos" : "") + '">' + (S.st.k[i] ? "space " + S.st.k[i] : "start pad") + " · " + laneState(i) + "</span></div>";
     }).join("") + "</div>" +
-    '<div class="note">Declared: ' + hon[0] + " knew, " + hon[1] + " guessed, " + hon[2] + " looked up.</div>" +
     '<button class="btn" data-act="again">Play again</button>';
 }
 
@@ -465,8 +456,6 @@ document.addEventListener("click", function (e) {
     resolve(+b.getAttribute("data-i")); return;
   } else if (act === "shield") {
     playRound(S.pending, +b.getAttribute("data-i"));
-  } else if (act === "honest") {
-    S.honesty[S.lane][S.round] = +b.getAttribute("data-k");
   } else if (act === "next") {
     if (!laneDone(S.lane)) { S.round++; ask(); }
     else if (S.lane === 2) S.phase = "result";

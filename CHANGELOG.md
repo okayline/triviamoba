@@ -4,6 +4,13 @@ Newest first. Times are Hawaii time (HST). The page shows its version in the low
 
 ---
 
+## v0.5.2
+**Fri Oct 23, 2026 · 4:15 AM HST**
+
+- The reveal no longer asks "How did you get it?" (I knew it / I guessed / I looked it up), and the result no longer says "Declared: N knew, N guessed, N looked up". Removed: that question and its three chips, the "Nothing to look up on this one" note on crowd rounds, the saved answers, the result line, and the chip CSS.
+
+---
+
 ## v0.5.1
 **Fri Oct 23, 2026 · 4:13 AM HST**
 
