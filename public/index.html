@@ -466,9 +466,9 @@ function renderResult() {
   var total = 0, hon = [0, 0, 0];
   S.rounds.forEach(function (rs) { rs.forEach(function (r) { total += r.net; }); });
   S.honesty.forEach(function (hs) { hs.forEach(function (k) { if (k !== undefined) hon[k]++; }); });
-  var head = won > lost ? "You win" : won < lost ? "Not this time" : "Draw";
+  var head = won > lost ? "You win" : won < lost ? "" : "Draw";   // no big headline when more lanes were lost
   $stage.innerHTML =
-    '<div class="label">Result</div><div class="big">' + head + "</div>" +
+    '<div class="label">Result</div>' + (head ? '<div class="big">' + head + "</div>" : "") +
     '<div class="note">' + won + " lane" + (won === 1 ? "" : "s") + " won, " + lost + " lost, over " + S.rounds.reduce(function (a, rs) { return a + rs.length; }, 0) + " questions. Net push " + fmt(Math.round(total * 10) / 10) + ".</div>" +
     "<div>" + [0, 1, 2].map(function (i) {
       var w = wins[i];
