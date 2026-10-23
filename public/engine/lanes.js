@@ -6,11 +6,11 @@
 // action; a wrong answer lets the wave through (−1), unless the lane has a shield, which blocks that one wave.
 //   STR  right: push forward 2.
 //   DEF  right: push forward 2, and place a shield on any lane (it blocks the next wave there).
-//   INT  right: heal +1 in any lane you pick (tap its start pad).
+//   INT  right: push forward 1, and heal +1 in any lane you pick (tap its start pad; heal INT itself and it moves 2).
 // Reaching space 5 in any lane takes the tower by the goal and ends the game.
 (function () {
   var LANES = ["def", "str", "int"];
-  var TOP = 5, START = 0, WAVE = 1, PUSH = 2, HEAL = 1;   // 0 is the start pad
+  var TOP = 5, START = 0, WAVE = 1, PUSH = 2, INT_PUSH = 1, HEAL = 1;   // 0 is the start pad
   var CYCLE = 5, CROWD_ROUNDS = [1, 3];   // in each lane, its 2nd and 4th questions of every 5 are crowd rounds
 
   function fresh() { return { k: [START, START, START], shields: [0, 0, 0] }; }
@@ -24,7 +24,7 @@
   function play(st, lane, right, target) {
     var kind = LANES[lane], ev = { lane: lane, right: right, from: st.k.slice() };
     if (right) {
-      if (kind === "int") { ev.healed = target; move(st, target, HEAL); }
+      if (kind === "int") { move(st, lane, INT_PUSH); ev.healed = target; move(st, target, HEAL); }
       else {
         move(st, lane, PUSH);
         if (kind === "def") { ev.shield = target; st.shields[target]++; }
@@ -35,12 +35,15 @@
     return ev;
   }
 
+  // How far a right INT answer moves the lane `target` you tap: the heal, plus INT's own push when you heal INT itself.
+  function healGain(target) { return HEAL + (LANES[target] === "int" ? INT_PUSH : 0); }
+
   // Is the lane won: its marker is on space 5, at the tower by the goal.
   function won(st, lane) { return st.k[lane] === TOP; }
   // The lane that ended the game, or -1 while it is still on.
   function winner(st) { for (var i = 0; i < st.k.length; i++) if (won(st, i)) return i; return -1; }
 
-  var api = { LANES: LANES, START: START, TOP: TOP, WAVE: WAVE, PUSH: PUSH, HEAL: HEAL, CYCLE: CYCLE, CROWD_ROUNDS: CROWD_ROUNDS,
+  var api = { LANES: LANES, START: START, TOP: TOP, WAVE: WAVE, PUSH: PUSH, INT_PUSH: INT_PUSH, HEAL: HEAL, healGain: healGain, CYCLE: CYCLE, CROWD_ROUNDS: CROWD_ROUNDS,
               fresh: fresh, play: play, isCrowd: isCrowd, won: won, winner: winner };
   globalThis.LANES = api;   // a plain script in the page; the tests import the file and read globalThis.LANES
 })();

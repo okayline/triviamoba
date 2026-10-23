@@ -4,6 +4,13 @@ Newest first. Times are Hawaii time (HST). The page shows its version in the low
 
 ---
 
+## v0.7
+**Fri Oct 23, 2026 · 4:36 AM HST**
+
+- A right INT answer always moves INT forward 1 and also heals +1 in the lane you tap. Tap INT's own pad and INT moves 2. The pad shows "+1" (or "+2" on INT's own pad), and the reveal reads "Pushed, healed X". Removed: the heal being INT's whole reward (before, tapping another lane left INT's marker where it was).
+
+---
+
 ## v0.6.1
 **Fri Oct 23, 2026 · 4:33 AM HST**
 

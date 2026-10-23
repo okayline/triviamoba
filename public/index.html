@@ -150,7 +150,7 @@ h1 { font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-hei
   </header>
   <section id="board" aria-label="Lanes"></section>
   <main id="stage" class="panel" aria-live="polite"></main>
-  <div class="ver">v0.6.1</div>
+  <div class="ver">v0.7</div>
 </div>
 
 <script src="engine/lanes.js"></script>
@@ -302,7 +302,7 @@ function renderBoard() {
     for (var j = 1; j <= 5; j++) {
       var d0 = D0 + (j - 1) * CELL + 2, d1 = D0 + j * CELL - 2;
       var c = [flat(i, d0, -HALF), flat(i, d1, -HALF), flat(i, d1, HALF), flat(i, d0, HALF)].map(proj);
-      tiles.push({ y: flat(i, (d0 + d1) / 2, 0).y, html: wrap(slab(c, 6 - j <= k), S.phase === "heal" && 6 - j > k && 6 - j <= k + LANES.HEAL ? "nx l" + i : "") });   // tile j from the hub is space 6 − j; in the heal phase the tiles the heal would fill are marked, to light up when you hover the pad
+      tiles.push({ y: flat(i, (d0 + d1) / 2, 0).y, html: wrap(slab(c, 6 - j <= k), S.phase === "heal" && 6 - j > k && 6 - j <= k + LANES.healGain(i) ? "nx l" + i : "") });   // tile j from the hub is space 6 − j; in the heal phase the tiles the heal would fill are marked, to light up when you hover the pad
     }
     var pad = flat(i, D0 + LEN + PAD_R + 6, 0);
     var taken = laneWon(i);
@@ -316,7 +316,7 @@ function renderBoard() {
       });
     }
     var padHtml = wrap(slab(ring(pad.x, pad.y, PAD_R, 16), true));   // your start pad, lit; in the pick phase it is the lane's button
-    if (S.phase === "heal") tokens.push({ y: 1e6, html: '<text class="plus l' + i + '" x="' + proj(pad).x + '" y="' + proj(pad).y + '" text-anchor="middle" dominant-baseline="central">+' + LANES.HEAL + '</text>' });   // the pad's centre, drawn over the marker; shown when you hover the pad
+    if (S.phase === "heal") tokens.push({ y: 1e6, html: '<text class="plus l' + i + '" x="' + proj(pad).x + '" y="' + proj(pad).y + '" text-anchor="middle" dominant-baseline="central">+' + LANES.healGain(i) + '</text>' });   // the pad's centre, drawn over the marker; shown when you hover the pad
     tiles.push({ y: pad.y, html: padsLive() ? '<g class="pad p' + i + ' c-' + tag + '" data-act="' + (S.phase === "pick" ? "lane" : "heal") + '" data-i="' + i + '" role="button" tabindex="0" aria-label="' + (S.phase === "pick" ? LABEL[tag] : "Heal " + SHORT[tag]) + '">' + padHtml + "</g>" : padHtml });
     var at = function (n) { return n === 0 ? pad : flat(i, D0 + CELL * (5 - n + 0.5), 0); };   // the middle of space n (0: the start pad)
     var m = proj(at(k));
@@ -394,9 +394,9 @@ function renderShield() {
 
 function renderReveal() {
   var i = S.lane, tag = TODAY[i], r = S.rounds[i][S.rounds[i].length - 1], ev = r.ev, me = hero(S.lineup[i]);
-  var over = LANES.winner(S.st) >= 0, at = ev.healed !== undefined ? ev.healed : i, moved = ev.to[at] - ev.from[at];
+  var over = LANES.winner(S.st) >= 0, at = ev.healed !== undefined ? ev.healed : i, moved = ev.to[i] - ev.from[i];
   var verdict = ev.shield !== undefined ? (moved > 0 ? "Pushed, shield on " : "Shield on ") + SHORT[TODAY[ev.shield]]
-    : ev.healed !== undefined ? "Healed " + SHORT[TODAY[ev.healed]] + " +" + LANES.HEAL
+    : ev.healed !== undefined ? "Pushed, healed " + SHORT[TODAY[ev.healed]]
     : ev.blocked ? "Wave blocked"
     : moved > 0 ? "You push the lane" : moved < 0 ? "Pushed back" : "Held";
   if (over) verdict = "Tower taken";
@@ -404,7 +404,7 @@ function renderReveal() {
   $stage.innerHTML =
     '<div class="label">Round ' + roundsPlayed() + '</div>' +
     '<div class="verdict c-' + tag + '">' + verdict + "</div>" +
-    '<div class="note">' + answeredLine(r) + how + " Marker on space " + S.st.k[at] + " of 5.</div>" +
+    '<div class="note">' + answeredLine(r) + how + " Marker on space " + S.st.k[i] + " of 5." + (at !== i ? " " + SHORT[TODAY[at]] + " is on space " + S.st.k[at] + "." : "") + "</div>" +
     '<div class="cols">' +
       '<div class="side"><span class="who">You</span><span class="crit ' + (moved > 0 || ev.shield !== undefined || ev.healed !== undefined ? "win" : moved < 0 ? "lose" : "") + '">' + me.e + '</span><span class="hn">' + me.name + '</span><span class="line">' + SHORT[tag] + '</span><span class="pushv ' + cls(moved) + '">' + fmt(moved) + "</span></div>" +
     "</div>" +
