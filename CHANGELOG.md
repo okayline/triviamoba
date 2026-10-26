@@ -4,6 +4,16 @@ Newest first. Times are Hawaii time (HST). The page shows its version in the low
 
 ---
 
+## v0.19
+**Mon Oct 26, 2026 · 12:39 AM HST** (run SCATTER.EXE's `migrations/002_sessions.sql` first; it makes `scatter_sessions`)
+
+- **[USER] next to the version.** Save codes and passkeys, the shared 88x31 ones, so your player follows you to another browser and the other 88x31 games. Passkeys only work on an 88x31.app address.
+- **Carry.** USER shows the copy you carry into every 88x31 game (gold if the Moon blessed it) and every copy your account holds in any game, with Pin to carry another. Writing both crowd answers marks the copy you carry.
+- The ACCOUNTS and REGISTRY bindings to dungeon-items. The account code is SCATTER.EXE's (`src/accounts.js`).
+- Removed: nothing.
+
+---
+
 ## v0.18
 **Fri Oct 23, 2026 · 7:12 AM HST** (no migration; nothing new to run)
 

@@ -9,6 +9,11 @@
     "binding": "ASSETS",
     "run_worker_first": ["/api/*"]
   },
+  // (v0.19) save codes, passkeys and the carried copy: the shared Accounts and Registry (dungeon-items)
+  "services": [
+    { "binding": "ACCOUNTS", "service": "dungeon-items", "entrypoint": "Accounts" },
+    { "binding": "REGISTRY", "service": "dungeon-items", "entrypoint": "Registry" }
+  ],
   // the moba-beat database: SCATTER.EXE's scatter_ tables, shared, plus TriviaMoba's (migrations/001_crowd.sql)
   "d1_databases": [
     {

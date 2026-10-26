@@ -18,12 +18,16 @@
 //
 // The questions and their answers are src/questions.js and are never sent before they are answered. The crowd rules are public/engine/crowd.js, the same file the page loads. The day's seed is made with the Worker secret
 // DAILY_SECRET (src/ledger.js daySeed) and never leaves the Worker; the day's entry holds only its hash.
+//
+// (v0.19) Save codes, passkeys and the carried copy: src/accounts.js (GET /api/account, POST /api/codes, /load, /passkey,
+// /logout, /pin), shared with SCATTER.EXE. Writing both crowd answers marks the copy you carry ("wrote_crowd").
 
 import { sha256, head, writeInsert, crowdDay, daySeed, isUnique } from "./ledger.js";
 import * as C from "../public/engine/crowd.js";
 import { registryHeadAt } from "./registry.js";
 import "../public/engine/lanes.js";   // sets globalThis.LANES: the lanes and their order (def, str, int)
 import { BANK, TIME, GRACE } from "./questions.js";
+import { accounts, sessionPlayer } from "./accounts.js";
 
 const COOKIE = "tm";
 const COOKIE_MAX_AGE = 400 * 86400;
@@ -82,8 +86,9 @@ const withCookie = (res, cookie) => { if (cookie) res.headers.append("set-cookie
 async function findPlayer(req, env) {
   const token = readCookie(req);
   if (!token) return null;
-  const p = await env.DB.prepare("SELECT id, seen_at FROM scatter_players WHERE token_hash = ?").bind(await sha256(token)).first();
-  if (!p) return null;
+  const h = await sha256(token);
+  const p = await env.DB.prepare("SELECT id, seen_at FROM scatter_players WHERE token_hash = ?").bind(h).first();
+  if (!p) return sessionPlayer(env, h, now());   // (v0.19) a browser loaded with a save code or passkey
   if (now() - p.seen_at >= SEEN_EVERY) await env.DB.prepare("UPDATE scatter_players SET seen_at = ? WHERE id = ?").bind(now(), p.id).run();
   return p;
 }
@@ -173,6 +178,7 @@ async function write(req, env) {
         throw new Oops("You already wrote today.", 409);
       continue;
     }
+    if (answers.every((x) => x.a)) await acct.markCarry(env, player.id, "wrote_crowd", "write:" + day);   // (v0.19) both answers written
     return withCookie(json(await view(env, player, day)), cookie);
   }
   throw new Error("The ledger is busy. Try again.");
@@ -255,3 +261,8 @@ const ROUTES = {
   "POST /api/deal": deal,
   "POST /api/answer": answer,
 };
+
+// ---------- accounts (v0.19) ----------
+const acct = accounts({ GAME: "triviamoba", cookieFor: setCookie, clearCookie: `${COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`,
+  readCookie, now: () => now(), rateLimit, findPlayer, json, Oops });
+Object.assign(ROUTES, acct.routes);

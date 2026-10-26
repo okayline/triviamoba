@@ -19,6 +19,16 @@ CREATE TABLE IF NOT EXISTS scatter_rate_limits (
   PRIMARY KEY (key, window_start)
 );
 
+-- (SCATTER.EXE v0.2.0) Browsers loaded later with a save code or passkey: each has its own cookie token here (hashed).
+-- TriviaMoba uses it too (src/accounts.js). Made by scatter-exe migrations/002_sessions.sql.
+CREATE TABLE IF NOT EXISTS scatter_sessions (
+  token_hash  TEXT PRIMARY KEY,
+  player_id   INTEGER NOT NULL REFERENCES scatter_players(id) ON DELETE CASCADE,
+  created_at  INTEGER NOT NULL,
+  seen_at     INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS scatter_sessions_player ON scatter_sessions (player_id);
+
 -- (SCATTER.EXE) Its 8-answer sheets. TriviaMoba doesn't use this table.
 CREATE TABLE IF NOT EXISTS scatter_sheets (
   id          INTEGER PRIMARY KEY,

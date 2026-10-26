@@ -178,3 +178,30 @@ test("a finished day's seed is shown with its hash; today's never, a day with no
   env.DAILY_SECRET = "a-changed-secret";
   await assert.rejects(() => worker.fetch(new Request("https://tm.test/api/seed?day=2027-01-01"), env).then(async (x) => { if (x.status !== 500) return; throw new Error("500"); }), /500/, "a seed that doesn't match its hash is not shown");
 });
+
+test("(v0.19) a save code brings your player to another browser; USER shows the carried copy; writing both answers marks it", async () => {
+  const { env, call } = setup();
+  const marks = [], links = new Map();
+  env.ACCOUNTS = {
+    async accountOf(g, p) { return { accountId: links.get(g + ":" + p) ?? null }; },
+    async createAccount() { return { accountId: 7 }; },
+    async link(a, g, p) { links.set(g + ":" + p, a); return { linked: true, playerId: p }; },
+    async addCode() { return { code: "AAAA-BBBB" }; },
+    async info() { return { codes: [], passkeys: [] }; },
+    async loginCode() { return { accountId: 7 }; },
+    async playerFor(a, g) { for (const [k, v] of links) if (v === a && k.startsWith(g + ":")) return { playerId: Number(k.split(":")[1]) }; return { playerId: null }; },
+  };
+  env.REGISTRY = {
+    async pinned() { return { itemId: 3, copy: 2, item: { name: "Neon" }, marks: [{ kind: "moon", value: "blessed" }] }; },
+    async heldAcross() { return []; },
+    async markCarried(a) { marks.push(a); return { ok: true }; },
+  };
+  await call("ann", "POST", "/api/codes", { action: "new" });
+  const a = await call("ann", "GET", "/api/account");
+  assert.deepEqual(a.carry, { name: "Neon", copy: 2, blessed: 1 });
+  await call("bob", "POST", "/api/load", { code: "AAAA-BBBB" });
+  assert.equal((await call("bob", "GET", "/api/account")).id, a.id);
+  const d = await call("bob", "GET", "/api/today");
+  await call("bob", "POST", "/api/write", { day: d.day, answers: ["one", "two"] });
+  assert.deepEqual(marks.map((m) => [m.value, m.key, m.by.game, m.by.playerId]), [["wrote_crowd", "write:" + d.day, "triviamoba", a.id]]);
+});
