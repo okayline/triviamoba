@@ -4,6 +4,12 @@ Newest first. Times are Hawaii time (HST). The page shows its version in the low
 
 ---
 
+## v0.20
+**Thu Oct 29, 2026**
+
+- **The shared footer** from dungeon-items ("© ~*~88x31~*~ cLuB, year · ≡ v0.20"), the same line every 88x31 game shows. Its ≡ opens the carry window (`/api/carry`): save codes, passkeys, logging in and out, and your copies with Pin. Removed: the version under the game panel.
+- **No USER page.** Removed: the [USER] button and the full-screen USER page (`account.js`).
+
 ## v0.19
 **Mon Oct 26, 2026 · 12:39 AM HST** (run SCATTER.EXE's `migrations/002_sessions.sql` first; it makes `scatter_sessions`)
 
