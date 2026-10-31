@@ -151,8 +151,9 @@ h1 { font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-hei
   </header>
   <section id="board" aria-label="Lanes"></section>
   <main id="stage" class="panel" aria-live="polite"></main>
-  <!-- the footer every game shows (dungeon-items src/footer.js): "🄯 ~*~88x31~*~ · § ≡ version"; ≡ pops up the save codes / passkeys / carry window (/api/carry) -->
-  <script src="https://dungeon-items.ddddungeon.workers.dev/footer.js" data-version="v0.22"></script>
+  <!-- the footer every game shows (dungeon-items src/footer.js): "🄯 ~*~88x31~*~ · § ≡ version", drawn into this spot; shown once the game has drawn -->
+  <div id="ddfoot" hidden></div>
+  <script src="https://dungeon-items.ddddungeon.workers.dev/footer.js" data-version="v0.23"></script>
 </div>
 
 <script src="engine/lanes.js"></script>
@@ -472,6 +473,7 @@ document.addEventListener("keydown", function (e) {
 
 fresh();
 render();
+document.getElementById("ddfoot").hidden = false;   // (v0.23) the footer shows only once the game has drawn, so it is never alone mid-screen
 </script>
 </body>
 </html>
