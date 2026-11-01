@@ -4,6 +4,11 @@ Newest first. Times are Hawaii time (HST). The page shows its version in the low
 
 ---
 
+## v0.27
+**Sat Oct 31, 2026 · 11:00 PM HST**
+
+- **Tab icon in orange:** the "88 x 31" tab icon now uses moba-beat's orange version. Removed: this page's teal one.
+
 ## v0.26
 **Sat Oct 31, 2026 · 10:35 PM HST**
 
